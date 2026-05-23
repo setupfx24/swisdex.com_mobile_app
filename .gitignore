@@ -2,6 +2,10 @@
 
 # dependencies
 node_modules/
+# nuclear-cleanup stash dirs (from when Windows held node_modules handles)
+nm_old_*
+nm_stash_*
+node_modules_old_*
 
 # Expo
 .expo/
