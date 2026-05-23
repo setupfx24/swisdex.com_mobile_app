@@ -9,7 +9,10 @@ import {
   LayoutGrid,
   LogOut,
   ChevronRight,
+  Bell,
+  LifeBuoy,
 } from 'lucide-react-native';
+import { useNotificationsStore } from '@/stores/notificationsStore';
 import { Text, Divider, Pressable } from '@/ui';
 import { useTheme } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
@@ -64,6 +67,7 @@ export default function MoreTab() {
   const theme = useTheme();
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
+  const unread = useNotificationsStore((s) => s.unread);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
@@ -79,6 +83,21 @@ export default function MoreTab() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[12] }}>
         <Divider />
+
+        <Row
+          icon={<Bell size={18} color={theme.colors.text.primary} strokeWidth={1.75} />}
+          label="Inbox"
+          hint={unread > 0 ? `${unread} unread` : undefined}
+          onPress={() => router.push('/inbox')}
+        />
+        <Divider inset={theme.spacing[4]} />
+
+        <Row
+          icon={<LifeBuoy size={18} color={theme.colors.text.primary} strokeWidth={1.75} />}
+          label="Support"
+          onPress={() => router.push('/support')}
+        />
+        <Divider inset={theme.spacing[4]} />
 
         <Row
           icon={<LayoutGrid size={18} color={theme.colors.text.primary} strokeWidth={1.75} />}

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useNotificationsStore } from '@/stores/notificationsStore';
 
 /** Stack for the authenticated surface — holds the tab group + any
  *  pushed screens (account detail, KYC, edit profile, etc.). Modal-style
@@ -20,6 +21,15 @@ export default function AppLayout() {
       void loadAccounts();
     }
   }, [status, user, accountsLoaded, loadAccounts]);
+
+  // Notification badge polling — backend has no push, so we poll
+  // /notifications/unread-count every 30s. Stops on sign-out via
+  // the cleanup return.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    useNotificationsStore.getState().start();
+    return () => useNotificationsStore.getState().stop();
+  }, [status]);
 
   if (status === 'loading') return null;
   if (status === 'unauthenticated') return <Redirect href="/(auth)/login" />;

@@ -13,6 +13,7 @@ import { instrumentsApi } from '@/lib/api/instruments';
 import { ActiveAccountBadge } from '@/features/accounts/ActiveAccountBadge';
 import { InstrumentRow } from '@/features/market/InstrumentRow';
 import { ProfileCompleteGate } from '@/features/auth/ProfileCompleteGate';
+import { BannerStrip } from '@/features/banners/BannerStrip';
 
 export default function MarketsTab() {
   const theme = useTheme();
@@ -87,6 +88,8 @@ export default function MarketsTab() {
         <Text variant="h2">Markets</Text>
         <ActiveAccountBadge />
       </View>
+
+      <BannerStrip />
 
       {platformStatus?.maintenance_mode ? (
         <View
