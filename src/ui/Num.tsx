@@ -12,7 +12,7 @@ interface NumProps extends Omit<TextProps, 'children' | 'tone'> {
   /** Auto-color positive green / negative red — useful for PnL columns. */
   pnl?: boolean;
   /** Explicit tone override; pnl=true sets this automatically. */
-  tone?: 'primary' | 'secondary' | 'tertiary' | 'accent' | 'buy' | 'sell' | 'warning';
+  tone?: 'primary' | 'secondary' | 'tertiary' | 'accent' | 'buy' | 'sell' | 'warning' | 'inverse';
   /** Append text (currency, %, etc.) without breaking tabular alignment. */
   suffix?: string;
   /** Render as "--" when value is null/undefined/NaN. */
