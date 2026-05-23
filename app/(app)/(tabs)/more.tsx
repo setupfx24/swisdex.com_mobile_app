@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Bell,
   LifeBuoy,
+  Sparkles,
 } from 'lucide-react-native';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { Text, Divider, Pressable } from '@/ui';
@@ -83,6 +84,14 @@ export default function MoreTab() {
 
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[12] }}>
         <Divider />
+
+        <Row
+          icon={<Sparkles size={18} color={theme.colors.buy} strokeWidth={1.75} />}
+          label="Earn"
+          hint="Rewards · Staking · Copy · Referral"
+          onPress={() => router.push('/earn')}
+        />
+        <Divider inset={theme.spacing[4]} />
 
         <Row
           icon={<Bell size={18} color={theme.colors.text.primary} strokeWidth={1.75} />}
