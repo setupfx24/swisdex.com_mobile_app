@@ -4,3 +4,7 @@ export { Num } from './Num';
 export { Divider } from './Divider';
 export { Pressable } from './Pressable';
 export { Skeleton, SkeletonRow } from './Skeleton';
+export { Button } from './Button';
+export { TextInput } from './TextInput';
+export type { TextInputProps } from './TextInput';
+export { Field } from './Field';
