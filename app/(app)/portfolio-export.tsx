@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-// expo-file-system 56 split the legacy global functions (cacheDirectory,
-// downloadAsync, etc.) into '/legacy'. The new File/Directory class API
-// is friendlier for new code but the legacy path is the shortest route
-// to a working CSV/JSON download for now.
+// SDK 54+ split the legacy globals (cacheDirectory, downloadAsync, …)
+// out of the default export. The new File/Directory class API is in
+// the root module; the procedural helpers we use live in /legacy.
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Text, Button } from '@/ui';
