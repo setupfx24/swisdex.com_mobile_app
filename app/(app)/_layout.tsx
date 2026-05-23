@@ -1,13 +1,29 @@
+import { useEffect } from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
+import { useAccountsStore } from '@/stores/accountsStore';
 
-/** Stack layout for the authenticated app surface. Bounces to /auth/login
- *  if the user isn't signed in. Bottom-tab nav arrives in Phase 5+ — for
- *  now the only screen is /(app)/index. */
+/** Stack for the authenticated surface — holds the tab group + any
+ *  pushed screens (account detail, KYC, edit profile, etc.). Modal-style
+ *  screens push over the tabs, matching the Twitter/Robinhood pattern. */
 export default function AppLayout() {
   const status = useAuthStore((s) => s.status);
-  if (status === 'loading') return null; // splash still up via root layout
+  const user = useAuthStore((s) => s.user);
+  const loadAccounts = useAccountsStore((s) => s.load);
+  const accountsLoaded = useAccountsStore((s) => s.accounts.length > 0);
+
+  // Fetch the user's accounts once when authentication completes. Account
+  // switcher needs them everywhere; loading them here avoids each screen
+  // re-fetching on first visit.
+  useEffect(() => {
+    if (status === 'authenticated' && user && !accountsLoaded) {
+      void loadAccounts();
+    }
+  }, [status, user, accountsLoaded, loadAccounts]);
+
+  if (status === 'loading') return null;
   if (status === 'unauthenticated') return <Redirect href="/(auth)/login" />;
+
   return (
     <Stack
       screenOptions={{
