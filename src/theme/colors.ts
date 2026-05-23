@@ -1,95 +1,56 @@
-// Brand colors mirror the web trader's tailwind.config.ts (canon: green-on-black,
-// not the outdated "gold-on-black" comment in the web config). Light mode mirrors
-// the same discipline inverted — CLAUDE.md design rule "Light mode: same
-// discipline, inverted." Both palettes use the same accent / sell hues so brand
-// recognition survives a system theme switch.
-
-export interface ColorScheme {
-  bg: {
-    base: string;
-    primary: string;
-    secondary: string;
-    tertiary: string;
-    hover: string;
-    active: string;
-    input: string;
-  };
-  border: {
-    primary: string;
-    secondary: string;
-    accent: string;
-  };
-  text: {
-    primary: string;
-    secondary: string;
-    tertiary: string;
-    inverse: string;
-    accent: string;
-  };
-  // Trading accents — same hue across schemes for brand recognition
-  buy: string;
-  buyLight: string;
-  buyDark: string;
-  buyBg: string;
-  buyGlow: string;
-  sell: string;
-  sellLight: string;
-  sellDark: string;
-  sellBg: string;
-  sellGlow: string;
-  warning: string;
-  info: string;
-  danger: string;
-  success: string;
-  overlay: string;
-}
+// Vantage-inspired brand tokens. SwisDex retains the canon green #55a630
+// (web tailwind) instead of Vantage's orange — everything else mirrors
+// Vantage's April 2026 mobile redesign palette.
 
 const sharedAccents = {
-  buy: '#55a630',         // web canon — accent / buy / long
-  buyLight: '#7dc24f',
-  buyDark: '#3f7d22',
+  buy: '#55a630',
+  buyDark: '#3f7c24',
+  buyLight: '#6bc93b',
   buyBg: 'rgba(85,166,48,0.10)',
   buyGlow: 'rgba(85,166,48,0.22)',
-  sell: '#FF3B5C',        // brighter on mobile than web (#ef4444) so reds read on AMOLED
-  sellLight: '#ff6680',
-  sellDark: '#c91a3a',
-  sellBg: 'rgba(255,59,92,0.10)',
-  sellGlow: 'rgba(255,59,92,0.22)',
-  warning: '#FFB300',
-  info: '#29B6F6',
-  danger: '#FF1744',
-  success: '#3f7d22',
-};
+  buySubtle: '#1A2F12',
+  sell: '#FF2D55',
+  sellDark: '#cc1f44',
+  sellLight: '#ff5c80',
+  sellBg: 'rgba(255,45,85,0.10)',
+  sellGlow: 'rgba(255,45,85,0.22)',
+  sellSubtle: '#3A1219',
+  warning: '#F59E0B',
+  info: '#3B82F6',
+  danger: '#FF2D55',
+  success: '#55a630',
+} as const;
 
-export const darkColors: ColorScheme = {
+export const darkColors = {
   ...sharedAccents,
   bg: {
-    base: '#08090b',        // web canon
-    primary: '#0e0f12',
-    secondary: '#15161A',   // surfaces / sheets
+    base: '#08090b',
+    primary: '#08090b',
+    secondary: '#15161A',
     tertiary: '#1A1B20',
     hover: '#1F2024',
     active: '#26272D',
     input: '#101114',
+    chip: '#1F2024',
+    rowTintUp: 'rgba(85,166,48,0.04)',
+    rowTintDown: 'rgba(255,45,85,0.04)',
   },
   border: {
-    // Borders sit just above bg.secondary so they read as a hairline divider,
-    // not a frame. Per CLAUDE.md: "1px horizontal dividers for separation".
     primary: '#1F2024',
-    secondary: '#26272D',
+    secondary: '#2A2B30',
     accent: 'rgba(85,166,48,0.35)',
   },
   text: {
-    primary: '#E8E9EE',
-    secondary: '#8A8D96',
-    tertiary: '#5A5D66',
-    inverse: '#0E0F12',
-    accent: '#7dc24f',
+    primary: '#FFFFFF',
+    secondary: '#9CA3AF',
+    tertiary: '#6B7280',
+    inverse: '#08090b',
+    accent: '#6bc93b',
   },
   overlay: 'rgba(0,0,0,0.6)',
-};
+} as const;
 
-export const lightColors: ColorScheme = {
+export const lightColors = {
   ...sharedAccents,
   bg: {
     base: '#FAFBFC',
@@ -99,6 +60,9 @@ export const lightColors: ColorScheme = {
     hover: '#EDEFF2',
     active: '#E1E4E8',
     input: '#FFFFFF',
+    chip: '#E5E7EA',
+    rowTintUp: 'rgba(85,166,48,0.06)',
+    rowTintDown: 'rgba(255,45,85,0.06)',
   },
   border: {
     primary: '#E5E7EA',
@@ -110,7 +74,21 @@ export const lightColors: ColorScheme = {
     secondary: '#5A5D66',
     tertiary: '#8A8D96',
     inverse: '#FAFBFC',
-    accent: '#3f7d22',
+    accent: '#3f7c24',
   },
   overlay: 'rgba(8,9,11,0.5)',
+} as const;
+
+export type ColorScheme = {
+  buy: string; buyDark: string; buyLight: string; buyBg: string; buyGlow: string; buySubtle: string;
+  sell: string; sellDark: string; sellLight: string; sellBg: string; sellGlow: string; sellSubtle: string;
+  warning: string; info: string; danger: string; success: string;
+  bg: {
+    base: string; primary: string; secondary: string; tertiary: string;
+    hover: string; active: string; input: string; chip: string;
+    rowTintUp: string; rowTintDown: string;
+  };
+  border: { primary: string; secondary: string; accent: string };
+  text: { primary: string; secondary: string; tertiary: string; inverse: string; accent: string };
+  overlay: string;
 };

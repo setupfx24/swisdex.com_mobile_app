@@ -34,7 +34,7 @@ export default function VerifyEmailScreen() {
         setDone(true);
         // Bounce to app home after a brief beat so the success text is visible.
         setTimeout(() => {
-          if (!cancelled) router.replace('/(app)');
+          if (!cancelled) router.replace('/markets');
         }, 800);
       } catch (e: unknown) {
         if (cancelled) return;

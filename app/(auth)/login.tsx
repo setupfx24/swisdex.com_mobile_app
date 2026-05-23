@@ -40,7 +40,7 @@ export default function LoginScreen() {
         totp_code: needsTotp ? totp.trim() : undefined,
       });
       await completeAuth(tokens);
-      router.replace('/(app)');
+      router.replace('/markets');
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         // Backend signals 2FA via the AuthServiceError message string. Match
@@ -71,7 +71,7 @@ export default function LoginScreen() {
     try {
       const tokens = await authApi.demoLogin();
       await completeAuth(tokens);
-      router.replace('/(app)');
+      router.replace('/markets');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Demo sign-in failed.');
     } finally {

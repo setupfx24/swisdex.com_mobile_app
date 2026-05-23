@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
  *  who navigate here (e.g. via a stale deep link) bounce to the app home. */
 export default function AuthLayout() {
   const status = useAuthStore((s) => s.status);
-  if (status === 'authenticated') return <Redirect href="/(app)" />;
+  if (status === 'authenticated') return <Redirect href="/markets" />;
   return (
     <Stack
       screenOptions={{

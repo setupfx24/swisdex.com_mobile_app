@@ -49,7 +49,7 @@ export default function EarnHubScreen() {
         {ROWS.map((r, i) => (
           <View key={r.key}>
             <Pressable
-              onPress={() => router.push(r.path)}
+              onPress={() => router.push(r.path as never)}
               haptic="light"
               style={({ pressed }) => ({
                 flexDirection: 'row',

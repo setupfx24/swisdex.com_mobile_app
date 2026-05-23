@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@shopify/react-native-skia": "2.0.0-next.4",
+    "@shopify/react-native-skia": "2.2.12",
     "date-fns": "^4.3.0",
     "expo": "~54.0.0",
     "expo-application": "~7.0.0",
@@ -27,12 +27,12 @@
     "lucide-react-native": "^0.460.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-gesture-handler": "~2.24.0",
-    "react-native-reanimated": "~4.0.0",
-    "react-native-safe-area-context": "~5.4.0",
-    "react-native-screens": "~4.13.0",
-    "react-native-svg": "15.12.0",
-    "react-native-worklets": "~0.5.0",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.0",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "react-native-worklets": "0.5.1",
     "zustand": "^5.0.13"
   },
   "devDependencies": {

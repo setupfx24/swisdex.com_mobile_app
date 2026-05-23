@@ -12,7 +12,19 @@ export function BannerStrip() {
   const [banners, setBanners] = useState<Banner[]>([]);
 
   useEffect(() => {
-    bannersApi.list().then(setBanners).catch(() => setBanners([]));
+    // /banners may return a raw array or a {items:[]} envelope depending on
+    // backend version. Normalise so .map() never blows up on the JSX path.
+    bannersApi
+      .list()
+      .then((res) => {
+        const list = Array.isArray(res)
+          ? res
+          : Array.isArray((res as { items?: Banner[] })?.items)
+            ? (res as { items: Banner[] }).items
+            : [];
+        setBanners(list);
+      })
+      .catch(() => setBanners([]));
   }, []);
 
   if (banners.length === 0) return null;

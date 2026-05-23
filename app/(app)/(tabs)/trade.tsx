@@ -1,45 +1,42 @@
-import { useState, useEffect } from 'react';
-import { View, ActivityIndicator, ScrollView } from 'react-native';
+import { useState, useEffect, useMemo } from 'react';
+import { View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sliders } from 'lucide-react-native';
-import { Text, Num, Divider, Pressable } from '@/ui';
+import { router } from 'expo-router';
+import {
+  ChevronDown, MoreVertical, BarChart2, Bell, Minus, Plus, Info,
+} from 'lucide-react-native';
+import { Text, Num, Pressable, Divider, Button } from '@/ui';
 import { useTheme } from '@/theme';
-import { ActiveAccountBadge } from '@/features/accounts/ActiveAccountBadge';
 import { ProfileCompleteGate } from '@/features/auth/ProfileCompleteGate';
 import { useMarketDataStore } from '@/stores/marketDataStore';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { usePositionsStore } from '@/stores/positionsStore';
 import { priceSocket } from '@/lib/ws/priceSocket';
 import { tradeSocket } from '@/lib/ws/tradeSocket';
 import { startWebSocketLifecycle } from '@/lib/ws/appStateLifecycle';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { usePositionsStore } from '@/stores/positionsStore';
-import { TimeframePills, TimeframeBar } from '@/charts/TimeframePills';
-import { CandleChart } from '@/charts/CandleChart';
-import { useCandles } from '@/charts/useCandles';
-import { timeframeFor } from '@/charts/timeframes';
-import type { Timeframe } from '@/charts/types';
-import { QuickTradeBar } from '@/features/trading/QuickTradeBar';
-import { OrderSheet } from '@/features/trading/OrderSheet';
-import { PositionsPanel } from '@/features/trading/PositionsPanel';
-import { PanicCloseSheet } from '@/features/trading/PanicCloseSheet';
+import { DualPriceButton } from '@/features/trading/components/DualPriceButton';
+import { placeOrder } from '@/features/trading/orderClient';
 
+/** Vantage-style Trade terminal: account pill, symbol selector,
+ *  signature dual buy/sell pill, volume stepper, info rows, big CTA. */
 export default function TradeTab() {
   const theme = useTheme();
   const symbol = useMarketDataStore((s) => s.selectedSymbol);
   const instruments = useMarketDataStore((s) => s.instruments);
   const tick = useMarketDataStore((s) => s.prices[symbol]);
-  const prevBid = useMarketDataStore((s) => s.prevBids[symbol]);
   const updateTick = useMarketDataStore((s) => s.updateTick);
   const active = useAccountsStore((s) => s.active);
+  const positions = usePositionsStore((s) => s.positions);
   const loadPositions = usePositionsStore((s) => s.load);
 
-  const [tf, setTf] = useState<Timeframe>('5m');
-  const tfMeta = timeframeFor(tf);
-  const { candles, loading, error } = useCandles(symbol, tfMeta);
-  const [orderSheet, setOrderSheet] = useState(false);
-  const [panicSheet, setPanicSheet] = useState(false);
+  const [lots, setLots] = useState('0.01');
+  const [side, setSide] = useState<'buy' | 'sell' | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const instrument = instruments.find((i) => i.symbol === symbol);
+  const instrument = useMemo(
+    () => instruments.find((i) => i.symbol === symbol),
+    [instruments, symbol],
+  );
   const digits = instrument?.digits ?? 5;
 
   useEffect(() => {
@@ -53,123 +50,301 @@ export default function TradeTab() {
     if (!active) return;
     void tradeSocket.connect(active.id);
     void loadPositions(active.id);
-    const unsub = tradeSocket.subscribe((event) => {
-      // Any trade event for this account → re-sync positions.
-      if (event.type === 'order_filled' || event.type === 'position_closed' || event.type === 'balance_update') {
-        void loadPositions(active.id);
-      }
-    });
-    return unsub;
   }, [active, loadPositions]);
 
-  const changeAbs = tick && prevBid ? tick.bid - prevBid : 0;
-  const changePct = tick && prevBid && prevBid !== 0 ? (changeAbs / prevBid) * 100 : 0;
-  const marketOpen = true; // TODO(phase-8-followup): drive from instrumentsApi.marketStatus
+  const bump = (delta: number) => {
+    const cur = parseFloat(lots) || 0;
+    const next = Math.max(0.01, +(cur + delta).toFixed(2));
+    setLots(next.toFixed(2));
+  };
+
+  const submit = async (dir: 'buy' | 'sell') => {
+    if (!active) return setToast('No account selected.');
+    const lotsNum = parseFloat(lots);
+    if (!Number.isFinite(lotsNum) || lotsNum <= 0) return setToast('Invalid lot size.');
+    setSide(dir);
+    try {
+      await placeOrder(
+        { account_id: active.id, symbol, side: dir, order_type: 'market', lots: lotsNum },
+        { optimistic: true },
+      );
+      setToast(`${dir.toUpperCase()} ${lots} ${symbol}`);
+      setTimeout(() => setToast(null), 1_500);
+    } catch (e: unknown) {
+      setToast(e instanceof Error ? e.message : 'Order failed');
+      setTimeout(() => setToast(null), 3_000);
+    } finally {
+      setSide(null);
+    }
+  };
+
+  const equity = active?.equity ?? 0;
+  const leverage = active?.leverage ?? 100;
+
+  const margin = useMemo(() => {
+    const lotsNum = parseFloat(lots) || 0;
+    const cs = instrument?.contract_size ?? 100_000;
+    const price = tick?.ask ?? tick?.bid ?? 0;
+    if (!price || !cs) return 0;
+    return (lotsNum * cs * price) / leverage;
+  }, [lots, instrument, tick, leverage]);
+
+  const freeMargin = Math.max(0, equity - margin);
+  const marginLevelAfter = margin > 0 ? (equity / margin) * 100 : 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
       <ProfileCompleteGate />
+
+      {/* Top: CFDs / Copy toggle + 3-dot */}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: 'row', alignItems: 'center',
           paddingHorizontal: theme.spacing[4],
-          paddingTop: theme.spacing[2],
-          paddingBottom: theme.spacing[2],
+          paddingTop: theme.spacing[2], paddingBottom: theme.spacing[2],
+          gap: theme.spacing[2],
         }}
       >
-        <View>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
-            <Text variant="h2">{symbol}</Text>
-            <Num value={tick?.bid} digits={digits} variant="bodyLg" />
-          </View>
-          {tick ? (
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
-              <Num value={changeAbs} digits={digits} pnl signed variant="body" />
-              <Num value={changePct} digits={2} pnl signed suffix="%" variant="body" />
-            </View>
-          ) : null}
+        <View style={{ flexDirection: 'row', gap: theme.spacing[4] }}>
+          <Text variant="bodyLg" weight="bold">CFDs</Text>
+          <Pressable haptic="light" onPress={() => router.push('/earn/copy')}>
+            <Text variant="bodyLg" tone="secondary">Copy</Text>
+          </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}>
+        <View style={{ flex: 1 }} />
+        <Pressable haptic="light" onPress={() => {}} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+          <Bell size={20} color={theme.colors.text.primary} strokeWidth={1.75} />
+        </Pressable>
+        <Pressable haptic="light" onPress={() => router.push('/accounts')} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+          <MoreVertical size={20} color={theme.colors.text.primary} strokeWidth={1.75} />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: theme.spacing[4],
+          paddingBottom: theme.hitTargets.tabBarBottom + theme.spacing[6],
+          gap: theme.spacing[4],
+        }}
+      >
+        {/* Account pill + equity */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Pressable
-            onPress={() => setOrderSheet(true)}
             haptic="light"
+            onPress={() => router.push('/accounts')}
             style={({ pressed }) => ({
-              width: 40, height: 40,
-              borderRadius: theme.radius.lg,
-              backgroundColor: pressed ? theme.colors.bg.active : theme.colors.bg.secondary,
-              borderWidth: 1, borderColor: theme.colors.border.primary,
-              alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'row', alignItems: 'center',
+              gap: theme.spacing[2],
+              paddingVertical: theme.spacing[2],
+              paddingHorizontal: theme.spacing[3],
+              borderRadius: theme.radius.pill,
+              backgroundColor: pressed ? theme.colors.bg.hover : theme.colors.bg.chip,
             })}
           >
-            <Sliders size={18} color={theme.colors.text.primary} strokeWidth={1.75} />
+            {active?.is_demo ? (
+              <View
+                style={{
+                  paddingHorizontal: theme.spacing[2], paddingVertical: 2,
+                  borderRadius: theme.radius.sm,
+                  backgroundColor: 'rgba(167,139,250,0.18)',
+                }}
+              >
+                <Text variant="labelXs" style={{ color: '#A78BFA', fontSize: 10 }}>DEMO</Text>
+              </View>
+            ) : null}
+            <Text variant="bodyMd" weight="medium">
+              {active ? `#${active.account_number}` : 'Pick account'}
+            </Text>
+            <ChevronDown size={14} color={theme.colors.text.secondary} />
           </Pressable>
-          <ActiveAccountBadge variant="compact" />
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text variant="labelXs" tone="secondary">Equity USD</Text>
+            <Num value={equity} digits={2} variant="num" />
+          </View>
         </View>
-      </View>
 
-      <TimeframeBar>
-        <TimeframePills value={tf} onChange={setTf} />
-      </TimeframeBar>
+        {/* Symbol selector */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Pressable
+            haptic="light"
+            onPress={() => router.push('/instruments')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1] }}
+          >
+            <Text variant="h1">{symbol}</Text>
+            <ChevronDown size={20} color={theme.colors.text.primary} />
+          </Pressable>
+          <Pressable
+            haptic="light"
+            onPress={() => {}}
+            style={{
+              width: 40, height: 40,
+              borderRadius: theme.radius.md,
+              backgroundColor: theme.colors.bg.secondary,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <BarChart2 size={20} color={theme.colors.text.primary} strokeWidth={1.75} />
+          </Pressable>
+        </View>
 
-      <View style={{ flex: 1, minHeight: 220 }}>
-        {loading && candles.length === 0 ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color={theme.colors.text.secondary} />
+        {/* DUAL PRICE BUTTON */}
+        <DualPriceButton
+          bid={tick?.bid}
+          ask={tick?.ask}
+          digits={digits}
+          onSell={() => submit('sell')}
+          onBuy={() => submit('buy')}
+          disabled={side !== null || !tick}
+        />
+
+        {/* Order type */}
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[3],
+            borderRadius: theme.radius.md,
+            backgroundColor: theme.colors.bg.secondary,
+            gap: theme.spacing[1],
+          }}
+        >
+          <Text variant="bodyMd" weight="medium">Market</Text>
+          <ChevronDown size={14} color={theme.colors.text.secondary} />
+          <View style={{ flex: 1 }} />
+          <Text variant="bodyMd" tone="tertiary">Fill at market price</Text>
+        </View>
+
+        {/* Volume stepper */}
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[3],
+            borderRadius: theme.radius.md,
+            backgroundColor: theme.colors.bg.secondary,
+            gap: theme.spacing[3],
+          }}
+        >
+          <Pressable
+            haptic="light"
+            onPress={() => bump(-0.01)}
+            style={{
+              width: 36, height: 36,
+              borderRadius: theme.radius.pill,
+              backgroundColor: theme.colors.bg.chip,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Minus size={16} color={theme.colors.text.primary} strokeWidth={2.5} />
+          </Pressable>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text variant="numLg">{lots}</Text>
           </View>
-        ) : error ? (
-          <View style={{ padding: theme.spacing[4] }}>
-            <Text variant="bodyMd" tone="sell">{error}</Text>
-          </View>
-        ) : (
-          <CandleChart candles={candles} digits={digits} />
-        )}
-      </View>
+          <Pressable
+            haptic="light"
+            onPress={() => bump(0.01)}
+            style={{
+              width: 36, height: 36,
+              borderRadius: theme.radius.pill,
+              backgroundColor: theme.colors.bg.chip,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Plus size={16} color={theme.colors.text.primary} strokeWidth={2.5} />
+          </Pressable>
+          <Pressable
+            haptic="light"
+            onPress={() => {}}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1] }}
+          >
+            <Text variant="bodyMd" weight="medium">Lots</Text>
+            <ChevronDown size={14} color={theme.colors.text.secondary} />
+          </Pressable>
+        </View>
 
-      <View style={{ maxHeight: 220 }}>
-        <PositionsPanel symbolFilter={undefined} maxHeight={220} onOpenPanic={() => setPanicSheet(true)} />
-      </View>
+        {/* Info rows */}
+        <View
+          style={{
+            padding: theme.spacing[4],
+            borderRadius: theme.radius.md,
+            backgroundColor: theme.colors.bg.secondary,
+            gap: theme.spacing[3],
+          }}
+        >
+          <InfoRow theme={theme} label="Margin Required" value={`$${margin.toFixed(2)} USD`} />
+          <InfoRow theme={theme} label="Free Margin" value={`$${freeMargin.toFixed(2)} USD`} />
+          <InfoRow
+            theme={theme}
+            label="Margin Level After"
+            value={marginLevelAfter > 0 ? `${marginLevelAfter.toFixed(2)}%` : '—'}
+          />
+          <InfoRow theme={theme} label="Leverage" value={`1:${leverage}`} />
+        </View>
+
+        {/* Big CTA — defaults to BUY accent */}
+        <Button
+          variant="buy"
+          size="xl"
+          onPress={() => submit('buy')}
+          loading={side === 'buy'}
+          disabled={!tick || side === 'sell'}
+        >
+          Buy {symbol}
+        </Button>
+
+        {/* Positions strip */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: theme.spacing[4],
+          }}
+        >
+          <View style={{ flexDirection: 'row', gap: theme.spacing[4] }}>
+            <Text variant="bodyMd" weight="bold">Positions ({positions.length})</Text>
+            <Text variant="bodyMd" tone="secondary">Pending (0)</Text>
+          </View>
+          {positions.length > 0 ? (
+            <Pressable haptic="medium" onPress={() => router.push('/(app)/(tabs)/portfolio')}>
+              <Text variant="bodyMd" tone="sell" weight="semibold">Close All</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        {positions.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: theme.spacing[6] }}>
+            <Info size={32} color={theme.colors.text.tertiary} strokeWidth={1.5} />
+            <View style={{ height: theme.spacing[2] }} />
+            <Text variant="bodyMd" tone="tertiary">No open positions</Text>
+          </View>
+        ) : null}
+      </ScrollView>
 
       {toast ? (
         <View
+          pointerEvents="none"
           style={{
             position: 'absolute',
-            bottom: 92,
+            bottom: theme.hitTargets.tabBarBottom + theme.spacing[3],
             left: theme.spacing[4],
             right: theme.spacing[4],
             padding: theme.spacing[3],
             borderRadius: theme.radius.md,
-            backgroundColor: theme.colors.sellBg,
-            borderWidth: 1, borderColor: theme.colors.sell,
+            backgroundColor: theme.colors.bg.secondary,
+            borderWidth: 1,
+            borderColor: theme.colors.border.primary,
           }}
         >
-          <Text variant="body" tone="sell">{toast}</Text>
+          <Text variant="bodyMd" align="center">{toast}</Text>
         </View>
       ) : null}
-
-      <QuickTradeBar
-        symbol={symbol}
-        digits={digits}
-        marketOpen={marketOpen}
-        onError={(msg) => {
-          setToast(msg);
-          setTimeout(() => setToast(null), 3_000);
-        }}
-      />
-
-      <OrderSheet
-        visible={orderSheet}
-        onClose={() => setOrderSheet(false)}
-        symbol={symbol}
-        digits={digits}
-        initialSide="buy"
-        initialPrice={tick?.bid}
-      />
-      <PanicCloseSheet
-        visible={panicSheet}
-        onClose={() => setPanicSheet(false)}
-      />
     </SafeAreaView>
+  );
+}
+
+function InfoRow({ theme, label, value }: { theme: ReturnType<typeof useTheme>; label: string; value: string }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Text variant="bodyMd" tone="secondary">{label}</Text>
+      <Text variant="bodyMd" weight="medium">{value}</Text>
+    </View>
   );
 }

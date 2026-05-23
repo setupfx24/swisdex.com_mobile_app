@@ -1,9 +1,3 @@
-// Half-pixel scale matching the web trader's tailwind config. Reading
-// `spacing[4]` (= 16px) anywhere in the codebase should land at the same
-// optical position as the web app's `p-4`. Numeric keys (not 'sm/md/lg')
-// because the web app's design system uses the same scheme and we want
-// 1:1 translatability when porting components.
-
 export const spacing = {
   0: 0,
   '0.5': 2,
@@ -23,20 +17,22 @@ export const spacing = {
 
 export const radius = {
   none: 0,
-  sm: 4,
-  base: 4,
-  md: 6,
-  lg: 8,
-  xl: 12,
-  '2xl': 16,
-  '3xl': 24,
+  sm: 6,
+  base: 6,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  '2xl': 24,
+  '3xl': 32,
+  pill: 999,
   full: 9999,
 } as const;
 
-// Minimum touch target per CLAUDE.md: 44pt (iOS HIG). Use this anywhere a user
-// can tap so density-driven UIs stay accessible.
 export const hitTargets = {
   min: 44,
   comfortable: 48,
-  buyButton: 56, // CLAUDE.md "Buy/Sell buttons: 56pt tall, full-width"
+  buyButton: 56,
+  // Floating tab bar inset — screens should add this to bottom padding so
+  // content doesn't disappear behind the pill.
+  tabBarBottom: 96,
 } as const;

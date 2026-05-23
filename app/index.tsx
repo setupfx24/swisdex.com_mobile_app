@@ -5,6 +5,6 @@ import { useAuthStore } from '@/stores/authStore';
  *  before this component mounts — we just funnel into the right group. */
 export default function RootIndex() {
   const status = useAuthStore((s) => s.status);
-  if (status === 'authenticated') return <Redirect href="/(app)" />;
+  if (status === 'authenticated') return <Redirect href="/markets" />;
   return <Redirect href="/(auth)/login" />;
 }

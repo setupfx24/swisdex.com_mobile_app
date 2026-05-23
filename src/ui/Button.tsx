@@ -34,8 +34,10 @@ export function Button({
 }: ButtonProps) {
   const theme = useTheme();
 
+  // Vantage spec: pill (radius 999) for every CTA, size 'xl' = 56pt for
+  // primary actions, 'lg' = 48pt for secondary white CTAs.
   const height = size === 'sm' ? 36 : size === 'md' ? 44 : size === 'lg' ? 48 : theme.hitTargets.buyButton;
-  const paddingH = size === 'sm' ? 12 : size === 'md' ? 16 : 20;
+  const paddingH = size === 'sm' ? 16 : size === 'md' ? 20 : 24;
 
   const palette = (() => {
     switch (variant) {
@@ -65,7 +67,7 @@ export function Button({
         {
           height,
           paddingHorizontal: paddingH,
-          borderRadius: theme.radius.md,
+          borderRadius: theme.radius.pill,
           backgroundColor: palette.bg,
           borderWidth: 1,
           borderColor: palette.border,

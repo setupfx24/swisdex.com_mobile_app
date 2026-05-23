@@ -7,7 +7,7 @@ export interface TextProps extends RNTextProps {
   variant?: TextVariant;
   tone?: Tone;
   align?: TextStyle['textAlign'];
-  weight?: 'regular' | 'medium' | 'bold';
+  weight?: 'regular' | 'medium' | 'semibold' | 'bold';
 }
 
 /** Single typography entry point. Avoid using RN's Text directly anywhere —
