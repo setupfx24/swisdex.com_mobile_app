@@ -16,6 +16,11 @@ import { tradeSocket } from '@/lib/ws/tradeSocket';
 import { startWebSocketLifecycle } from '@/lib/ws/appStateLifecycle';
 import { DualPriceButton } from '@/features/trading/components/DualPriceButton';
 import { placeOrder } from '@/features/trading/orderClient';
+import { CandleChart } from '@/charts/CandleChart';
+import { TimeframePills } from '@/charts/TimeframePills';
+import { useCandles } from '@/charts/useCandles';
+import { timeframeFor } from '@/charts/timeframes';
+import type { Timeframe } from '@/charts/types';
 
 /** Vantage-style Trade terminal: account pill, symbol selector,
  *  signature dual buy/sell pill, volume stepper, info rows, big CTA. */
@@ -32,6 +37,9 @@ export default function TradeTab() {
   const [lots, setLots] = useState('0.01');
   const [side, setSide] = useState<'buy' | 'sell' | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [tf, setTf] = useState<Timeframe>('5m');
+  const tfMeta = timeframeFor(tf);
+  const { candles, loading: candlesLoading } = useCandles(symbol, tfMeta);
 
   const instrument = useMemo(
     () => instruments.find((i) => i.symbol === symbol),
@@ -185,6 +193,36 @@ export default function TradeTab() {
           >
             <BarChart2 size={20} color={theme.colors.text.primary} strokeWidth={1.75} />
           </Pressable>
+        </View>
+
+        {/* Live candlestick chart — opens for whichever symbol the user
+         *  tapped in Markets / Instruments. Skia-rendered with long-press
+         *  crosshair; bars stream via /ws/bars. */}
+        <View
+          style={{
+            borderRadius: theme.radius.lg,
+            backgroundColor: theme.colors.bg.secondary,
+            overflow: 'hidden',
+          }}
+        >
+          <View style={{ paddingVertical: theme.spacing[2] }}>
+            <TimeframePills value={tf} onChange={setTf} />
+          </View>
+          <View style={{ height: 260 }}>
+            {candlesLoading && candles.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text variant="bodyMd" tone="tertiary">Loading bars…</Text>
+              </View>
+            ) : candles.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text variant="bodyMd" tone="tertiary">
+                  No bars for {symbol} on {tfMeta.label}
+                </Text>
+              </View>
+            ) : (
+              <CandleChart candles={candles} digits={digits} />
+            )}
+          </View>
         </View>
 
         {/* DUAL PRICE BUTTON */}
