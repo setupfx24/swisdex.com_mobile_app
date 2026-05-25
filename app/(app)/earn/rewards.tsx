@@ -73,7 +73,7 @@ export default function RewardsScreen() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}>
                       <Text variant="bodyMd" weight="medium">{m.title}</Text>
-                      <Text variant="labelXs" tone="tertiary">{m.type.toUpperCase()}</Text>
+                      <Text variant="labelXs" tone="tertiary">{(m.type ?? '').toUpperCase()}</Text>
                     </View>
                     {m.description ? <Text variant="body" tone="tertiary" numberOfLines={2}>{m.description}</Text> : null}
                     <Text variant="labelXs" tone="tertiary">

@@ -23,7 +23,13 @@ export default function OpenAccountScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const g = await accountsApi.availableGroups();
+        const res = await accountsApi.availableGroups();
+        // Backend may return [..] OR {items:[..]} OR null — normalise.
+        const g = Array.isArray(res)
+          ? res
+          : Array.isArray((res as { items?: typeof res })?.items)
+            ? (res as { items: typeof res }).items
+            : [];
         setGroups(g);
         const def = g.find((x) => !x.is_demo) ?? g[0] ?? null;
         if (def) {

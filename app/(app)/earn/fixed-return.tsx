@@ -30,8 +30,8 @@ export default function FixedReturnScreen() {
         {cfg === null ? (
           <View style={{ padding: theme.spacing[4] }}><SkeletonRow count={4} /></View>
         ) : (
-          cfg.tiers.map((t) => (
-            <View key={t.tenure_label}>
+          (cfg.tiers ?? []).map((t, i) => (
+            <View key={t.tenure_label ?? `tier-${i}`}>
               <View
                 style={{
                   paddingHorizontal: theme.spacing[4],
