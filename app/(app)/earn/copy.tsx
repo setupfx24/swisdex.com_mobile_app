@@ -13,12 +13,25 @@ export default function CopyScreen() {
   const [my, setMy] = useState<CopyAllocation[] | null>(null);
 
   const load = async () => {
+    // Normalise — gateway shapes vary (array, {items:[]}, null). Always
+    // land state on a real array so .map can't throw on render.
     try {
       const res = await socialApi.leaderboard();
-      setBoard(Array.isArray(res) ? res : res.items);
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray((res as { items?: LeaderboardEntry[] })?.items)
+          ? (res as { items: LeaderboardEntry[] }).items
+          : [];
+      setBoard(list);
     } catch { setBoard([]); }
     try {
-      setMy(await socialApi.myCopies());
+      const res = await socialApi.myCopies();
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray((res as { items?: CopyAllocation[] })?.items)
+          ? (res as { items: CopyAllocation[] }).items
+          : [];
+      setMy(list);
     } catch { setMy([]); }
   };
   useEffect(() => { void load(); }, []);
