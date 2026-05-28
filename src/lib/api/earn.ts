@@ -86,14 +86,37 @@ export const fixedReturnApi = {
 // ─── Insurance ───────────────────────────────────────────────────────
 export interface InsurancePolicy {
   id: string;
-  position_id: string;
-  symbol: string;
+  position_id?: string | null;
+  // Backend returns instrument_symbol (not "symbol"); keep both optional
+  // so older shapes don't break.
+  instrument_symbol?: string | null;
+  symbol?: string | null;
   tier: string;
   fee: number;
   coverage_pct: number;
   max_cap: number;
-  status: 'active' | 'settled' | 'cancelled';
-  created_at: string;
+  status: 'active' | 'claimed' | 'expired' | 'denied' | string;
+  activated_at: string;
+  settled_at?: string | null;
+  /** Why the policy ended up denied / expired. Code from backend
+   *  (min_duration, daily_claim_limit, not_a_loss, hedge,
+   *  policy_expired, …). Map to a friendly label via insuranceReasonLabel. */
+  settled_reason?: string | null;
+}
+
+/** Map a backend settled_reason code to a user-facing sentence. */
+export function insuranceReasonLabel(code: string | null | undefined): string | null {
+  if (!code) return null;
+  const map: Record<string, string> = {
+    min_duration: 'Position closed before the minimum insured holding time.',
+    daily_claim_limit: 'Daily claim limit for your account was reached.',
+    not_a_loss: 'Position closed in profit — no loss to cover.',
+    hedge: 'Position was hedged, which voids coverage.',
+    policy_expired: 'Coverage window elapsed before the position closed.',
+    max_cap_zero: 'Policy cap was zero — nothing to cover.',
+    manual_review: 'Declined after manual review.',
+  };
+  return map[code] ?? code.replace(/_/g, ' ');
 }
 
 export const insuranceApi = {

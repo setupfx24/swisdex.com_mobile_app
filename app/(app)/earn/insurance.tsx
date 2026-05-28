@@ -5,17 +5,39 @@ import { Stack } from 'expo-router';
 import { format } from 'date-fns';
 import { Text, Num, Divider, SkeletonRow } from '@/ui';
 import { useTheme } from '@/theme';
-import { insuranceApi, type InsurancePolicy } from '@/lib/api/earn';
+import { insuranceApi, insuranceReasonLabel, type InsurancePolicy } from '@/lib/api/earn';
 import { ProfileHeader } from '../profile';
+
+type Tone = 'buy' | 'sell' | 'tertiary' | 'accent';
+
+function statusTone(status: string): Tone {
+  switch (status) {
+    case 'active': return 'accent';
+    case 'claimed': return 'buy';
+    case 'denied': return 'sell';
+    case 'expired': return 'tertiary';
+    default: return 'tertiary';
+  }
+}
+
+function toArray<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  if (res && typeof res === 'object' && Array.isArray((res as { items?: T[] }).items)) {
+    return (res as { items: T[] }).items;
+  }
+  return [];
+}
 
 export default function InsuranceScreen() {
   const theme = useTheme();
-  const [active, setActive] = useState<InsurancePolicy[] | null>(null);
+  const [policies, setPolicies] = useState<InsurancePolicy[] | null>(null);
   const [claims, setClaims] = useState<{ id: string; policy_id: string; payout: number; created_at: string }[] | null>(null);
 
   useEffect(() => {
-    insuranceApi.active().then(setActive).catch(() => setActive([]));
-    insuranceApi.claims().then(setClaims).catch(() => setClaims([]));
+    // Full policy ledger (active + denied + expired + claimed) — mirrors the
+    // web "Policies" section. /active is a subset; /policies is everything.
+    insuranceApi.policies().then((r) => setPolicies(toArray<InsurancePolicy>(r))).catch(() => setPolicies([]));
+    insuranceApi.claims().then((r) => setClaims(toArray(r))).catch(() => setClaims([]));
   }, []);
 
   return (
@@ -23,24 +45,72 @@ export default function InsuranceScreen() {
       <Stack.Screen options={{ title: 'Insurance' }} />
       <ProfileHeader title="Trade insurance" />
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[8] }}>
-        <Section label="ACTIVE POLICIES" theme={theme}>
-          {active === null ? <SkeletonRow count={2} /> : active.length === 0 ? (
-            <Text variant="bodyMd" tone="tertiary" align="center">No active policies.</Text>
+        <Section label="POLICIES" theme={theme}>
+          {policies === null ? (
+            <SkeletonRow count={3} />
+          ) : policies.length === 0 ? (
+            <Text variant="bodyMd" tone="tertiary" align="center">No policies yet.</Text>
           ) : (
-            active.map((p) => (
-              <View key={p.id}>
-                <View style={{ paddingVertical: theme.spacing[3] }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text variant="bodyMd" weight="medium">{p.symbol} · {p.tier.toUpperCase()}</Text>
-                    <Text variant="labelXs" tone="accent">{p.coverage_pct.toFixed(0)}% cover</Text>
+            policies.map((p) => {
+              const sym = p.instrument_symbol ?? p.symbol ?? '—';
+              const tone = statusTone(p.status);
+              const reason = insuranceReasonLabel(p.settled_reason);
+              const ended = p.status !== 'active' && p.settled_at;
+              return (
+                <View key={p.id}>
+                  <View style={{ paddingVertical: theme.spacing[3], gap: 4 }}>
+                    {/* Row 1: status badge + symbol + tier + coverage / fee */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], flex: 1 }}>
+                        <View
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: theme.radius.sm,
+                            backgroundColor:
+                              tone === 'sell' ? theme.colors.sellBg
+                              : tone === 'buy' || tone === 'accent' ? theme.colors.buyBg
+                              : theme.colors.bg.chip,
+                          }}
+                        >
+                          <Text variant="caption" weight="bold" tone={tone === 'tertiary' ? 'tertiary' : tone}>
+                            {p.status.toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text variant="bodyMd" weight="medium">{sym}</Text>
+                        <Text variant="labelXs" tone="accent">{p.coverage_pct.toFixed(0)}%</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text variant="bodyB" tone="primary">${p.fee.toFixed(2)} fee</Text>
+                        <Text variant="caption" tone="tertiary">
+                          {p.coverage_pct.toFixed(0)}% covered · max ${p.max_cap.toFixed(0)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Row 2: denial reason (denied/expired) */}
+                    {reason && (p.status === 'denied' || p.status === 'expired') ? (
+                      <Text variant="body" tone="sell">
+                        {p.status === 'denied' ? 'Declined: ' : 'Expired: '}{reason}
+                      </Text>
+                    ) : null}
+
+                    {/* Row 3: settled / expiry timestamp */}
+                    {ended ? (
+                      <Text variant="caption" tone="tertiary">
+                        {p.status === 'expired' ? 'Expired ' : 'Settled '}
+                        {format(new Date(p.settled_at as string), 'MMM d, yyyy · HH:mm')}
+                      </Text>
+                    ) : (
+                      <Text variant="caption" tone="tertiary">
+                        Activated {format(new Date(p.activated_at), 'MMM d, yyyy · HH:mm')}
+                      </Text>
+                    )}
                   </View>
-                  <Text variant="body" tone="tertiary">
-                    Fee ${p.fee.toFixed(2)} · cap ${p.max_cap.toFixed(2)}
-                  </Text>
+                  <Divider />
                 </View>
-                <Divider />
-              </View>
-            ))
+              );
+            })
           )}
         </Section>
 
