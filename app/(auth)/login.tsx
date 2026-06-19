@@ -2,7 +2,8 @@ import { useState, useRef } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, type TextInput as RNTextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
-import { Text, Field, Button, Divider } from '@/ui';
+import { Eye, EyeOff } from 'lucide-react-native';
+import { Text, Field, Button, Divider, Pressable } from '@/ui';
 import { useTheme } from '@/theme';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/stores/authStore';
@@ -20,6 +21,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [totp, setTotp] = useState('');
   const [needsTotp, setNeedsTotp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -119,13 +121,28 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
-            secureTextEntry
+            secureTextEntry={!showPassword}
             autoComplete="password"
             returnKeyType={needsTotp ? 'next' : 'go'}
             onSubmitEditing={() => {
               if (!needsTotp) void onSubmit();
             }}
             editable={!submitting}
+            rightSlot={
+              <Pressable
+                haptic="light"
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={8}
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                style={{ padding: theme.spacing[1] }}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color={theme.colors.text.secondary} strokeWidth={1.85} />
+                ) : (
+                  <Eye size={20} color={theme.colors.text.secondary} strokeWidth={1.85} />
+                )}
+              </Pressable>
+            }
           />
 
           {needsTotp ? (

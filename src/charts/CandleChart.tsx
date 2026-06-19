@@ -129,7 +129,7 @@ export function CandleChart({ candles, digits }: Props) {
                 const bodyTop = Math.min(yOpen, yClose);
                 const bodyHeight = Math.max(1, Math.abs(yOpen - yClose));
                 return (
-                  <Group key={c.time}>
+                  <Group key={`${c.time}-${i}`}>
                     <Line p1={vec(wickX, yHigh)} p2={vec(wickX, yLow)} color={color} strokeWidth={1} />
                     <Rect x={bodyX} y={bodyTop} width={layout.bodyWidth} height={bodyHeight} color={color} />
                   </Group>

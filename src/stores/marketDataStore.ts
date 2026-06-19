@@ -23,6 +23,31 @@ interface State {
   removeFromWatchlist: (s: string) => Promise<void>;
 }
 
+// --- Tick coalescing buffer (perf) --------------------------------------
+// /ws/prices broadcasts EVERY symbol in a single message, so the socket
+// handler calls updateTick() dozens of times in one synchronous burst.
+// Doing a store set() per tick spreads the whole prices map each time
+// (O(n) × n ticks = O(n²) per message) and re-runs every subscriber's
+// equality check — that floods the JS thread and janks navigation/scroll.
+//
+// Instead we stash incoming ticks in a plain mutable buffer and flush them
+// into the store ONCE per animation frame. A 50-symbol message collapses
+// from 50 store updates to 1, at the cost of ≤1 frame (~16ms) of latency —
+// imperceptible for a price display, and market orders reconcile against
+// the server fill price anyway.
+let tickBuffer: Record<string, TickData> = {};
+let flushScheduled = false;
+let flushApply: (() => void) | null = null;
+
+function scheduleFlush() {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  requestAnimationFrame(() => {
+    flushScheduled = false;
+    flushApply?.();
+  });
+}
+
 export const useMarketDataStore = create<State>((set, get) => ({
   prices: {},
   prevBids: {},
@@ -32,16 +57,13 @@ export const useMarketDataStore = create<State>((set, get) => ({
 
   setInstruments: (i) => set({ instruments: i }),
 
-  // Hot path — called for every tick on every symbol. Keep this tight.
+  // Hot path — called once per symbol per WS message. We do NOT touch the
+  // store here; we only stash the latest tick per symbol and schedule a
+  // single coalesced flush (see scheduleFlush / flushApply above). This
+  // turns a burst of N synchronous updateTick() calls into one store set().
   updateTick: (t) => {
-    const sym = t.symbol;
-    set((s) => {
-      const prev = s.prices[sym];
-      return {
-        prices: { ...s.prices, [sym]: t },
-        prevBids: prev ? { ...s.prevBids, [sym]: prev.bid } : s.prevBids,
-      };
-    });
+    tickBuffer[t.symbol] = t;
+    scheduleFlush();
   },
 
   setSelectedSymbol: (s) => set({ selectedSymbol: s }),
@@ -76,3 +98,28 @@ export const useMarketDataStore = create<State>((set, get) => ({
     await SecureStore.setItemAsync(KEY_WATCHLIST, JSON.stringify(next)).catch(() => {});
   },
 }));
+
+// Drain the tick buffer into the store in a single set(). Runs at most once
+// per frame. Cloning prices/prevBids once and mutating the clone keeps this
+// O(symbols-changed) instead of O(symbols²). New object identities are only
+// produced when at least one tick actually arrived, so subscribers that read
+// an unchanged symbol still bail out of re-rendering.
+flushApply = () => {
+  const buffered = tickBuffer;
+  const symbols = Object.keys(buffered);
+  if (symbols.length === 0) return;
+  tickBuffer = {};
+
+  useMarketDataStore.setState((s) => {
+    const prices = { ...s.prices };
+    const prevBids = { ...s.prevBids };
+    for (const sym of symbols) {
+      const t = buffered[sym];
+      if (!t) continue;
+      const prev = prices[sym];
+      if (prev) prevBids[sym] = prev.bid;
+      prices[sym] = t;
+    }
+    return { prices, prevBids };
+  });
+};

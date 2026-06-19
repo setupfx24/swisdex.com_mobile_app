@@ -3,6 +3,8 @@ import { Redirect, Stack } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
+import { startTradeSync } from '@/lib/ws/tradeSync';
+import { setupPushNotifications, teardownPushNotifications } from '@/features/notifications/pushSetup';
 
 /** Stack for the authenticated surface — holds the tab group + any
  *  pushed screens (account detail, KYC, edit profile, etc.). Modal-style
@@ -29,6 +31,23 @@ export default function AppLayout() {
     if (status !== 'authenticated') return;
     useNotificationsStore.getState().start();
     return () => useNotificationsStore.getState().stop();
+  }, [status]);
+
+  // Real-time trade sync — reflect trades placed on the web (or any other
+  // device) on the same account here within a tick, across every tab.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const stop = startTradeSync();
+    return stop;
+  }, [status]);
+
+  // Push notifications — register this device + route taps to the inbox.
+  // No-op in Expo Go (no real push token); works in a dev/production build
+  // once the backend's /notifications/devices + push-send ship.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    void setupPushNotifications();
+    return () => teardownPushNotifications();
   }, [status]);
 
   if (status === 'loading') return null;

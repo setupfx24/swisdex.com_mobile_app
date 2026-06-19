@@ -35,10 +35,23 @@
           "image": "./assets/icon.png",
           "imageWidth": 200
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#16C72E"
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "096f221a-55c5-43c7-9ac9-3b95dd100134"
+      }
     }
   }
 }

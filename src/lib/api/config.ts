@@ -30,4 +30,10 @@ export const apiConfig = {
    *  NEXT_PUBLIC_GOOGLE_CLIENT_ID). Empty string disables the Google
    *  button on the login screen. */
   googleClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+  /** Cloudflare Turnstile site key (public) — same value as the web
+   *  trader's NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY. Used to render the
+   *  CAPTCHA widget on the register screen so production (which requires a
+   *  token) accepts mobile sign-ups. Empty string hides the widget. */
+  turnstileSiteKey:
+    process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAADNQN3w9syN3T-E6',
 } as const;

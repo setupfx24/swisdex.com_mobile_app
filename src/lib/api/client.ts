@@ -134,7 +134,10 @@ class ApiClient {
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       const detail = (errBody as { detail?: unknown }).detail;
-      const msg = formatApiDetail(detail, `HTTP ${res.status}`);
+      const fallback = res.status >= 500
+        ? 'Server is temporarily unavailable. Please try again in a moment.'
+        : `HTTP ${res.status}`;
+      const msg = formatApiDetail(detail, fallback);
       if (res.status === 401) throw new ApiAuthError(msg, path, detail);
       throw new ApiError(msg, res.status, path, detail);
     }
@@ -142,7 +145,13 @@ class ApiClient {
     // Empty 204s are common (mark-read etc). Don't blow up trying to JSON-parse.
     const text = await res.text();
     if (!text) return {} as T;
-    return JSON.parse(text) as T;
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      // 2xx with a non-JSON body (e.g. a proxy/gateway page) — surface a clean
+      // message rather than a raw "JSON Parse error".
+      throw new ApiError('Unexpected response from the server.', res.status, path);
+    }
   }
 
   get<T>(path: string, params?: RequestOptions['params'], opts?: RequestOptions): Promise<T> {

@@ -1,12 +1,37 @@
 import { useEffect, useCallback, useState } from 'react';
 import { View, FlatList, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { format } from 'date-fns';
 import { Text, Divider, Pressable, Button, SkeletonRow } from '@/ui';
 import { useTheme } from '@/theme';
 import { useNotificationsStore } from '@/stores/notificationsStore';
+import type { AppNotification } from '@/types/notifications';
 import { ProfileHeader } from './profile';
+
+/** Map a notification to the screen it's about, so tapping it deep-links to
+ *  the relevant page (KYC notice → KYC, deposit/withdrawal → transactions,
+ *  trade/margin → portfolio, etc.). Returns null when there's no obvious
+ *  target (just mark it read). */
+function routeForNotification(n: AppNotification): string | null {
+  const t = (n.type || '').toLowerCase();
+  const meta = n.meta ?? {};
+  if (t.includes('kyc')) return '/kyc';
+  if (t.includes('deposit') || t.includes('withdraw') || t.includes('transfer') || t.includes('payment')) return '/wallet/transactions';
+  if (t.includes('bonus')) return '/wallet';
+  if (t.includes('insurance')) return '/earn/insurance';
+  if (t.includes('fixed')) return '/earn/fixed-return';
+  if (t.includes('referral') || t.includes('commission') || t.includes('ib') || t.includes('affiliate')) return '/business';
+  if (t.includes('copy') || t.includes('pamm') || t.includes('mam') || t.includes('social') || t.includes('follow')) return '/social';
+  if (t.includes('order') || t.includes('trade') || t.includes('position') || t.includes('margin') || t.includes('stop') || t.includes('sl') || t.includes('tp')) {
+    return '/portfolio';
+  }
+  if (t.includes('support') || t.includes('ticket')) return '/support';
+  if (t.includes('account')) return '/accounts';
+  // A backend-provided deeplink in meta wins if present.
+  if (typeof meta.route === 'string') return meta.route;
+  return null;
+}
 
 export default function InboxScreen() {
   const theme = useTheme();
@@ -49,7 +74,11 @@ export default function InboxScreen() {
           renderItem={({ item }) => (
             <View>
               <Pressable
-                onPress={() => { if (!item.is_read) void markRead(item.id); }}
+                onPress={() => {
+                  if (!item.is_read) void markRead(item.id);
+                  const route = routeForNotification(item);
+                  if (route) router.push(route as never);
+                }}
                 haptic="light"
                 style={({ pressed }) => ({
                   paddingHorizontal: theme.spacing[4],

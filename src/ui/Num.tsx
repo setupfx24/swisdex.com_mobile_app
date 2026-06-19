@@ -45,13 +45,18 @@ export function Num({
 
   // Auto-tone for PnL columns. Zero stays neutral so a flat position doesn't
   // flash colour the moment it kisses break-even.
+  const numVal = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
   const resolvedTone: NumProps['tone'] = useMemo(() => {
     if (tone) return tone;
     if (!pnl) return 'primary';
-    const n = typeof value === 'number' ? value : parseFloat(String(value ?? ''));
-    if (!Number.isFinite(n) || n === 0) return 'secondary';
-    return n > 0 ? 'buy' : 'sell';
-  }, [tone, pnl, value]);
+    if (!Number.isFinite(numVal) || numVal === 0) return 'secondary';
+    return 'buy';
+  }, [tone, pnl, numVal]);
+
+  // P/L: profit → green; loss → explicit red (theme `sell` is green here).
+  const pnlColor = pnl && !tone && Number.isFinite(numVal) && numVal < 0 ? '#FF5C5C'
+    : pnl && !tone && Number.isFinite(numVal) && numVal > 0 ? theme.colors.buy
+      : undefined;
 
   const explicitStyle: TextStyle | undefined = useMemo(
     () => ({ fontVariant: ['tabular-nums'] }),
@@ -62,7 +67,7 @@ export function Num({
     <Text
       variant={variant}
       tone={resolvedTone}
-      style={[explicitStyle, style]}
+      style={[explicitStyle, pnlColor ? { color: pnlColor } : null, style]}
       {...rest}
     >
       {text}

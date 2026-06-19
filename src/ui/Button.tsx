@@ -14,6 +14,13 @@ interface ButtonProps {
   disabled?: boolean;
   /** Stretch to fill parent width. Default true — matches trading-app patterns. */
   fullWidth?: boolean;
+  /** Override the background + border colour (fg stays white). Used for
+   *  one-off CTAs that need a colour outside the variant set. */
+  color?: string;
+  /** Round pill shape (radius 999) for hero CTAs like the reference design. */
+  pill?: boolean;
+  /** Force the coloured glow on/off. Defaults ON for coloured variants in dark mode. */
+  glow?: boolean;
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }
@@ -29,15 +36,18 @@ export function Button({
   loading = false,
   disabled = false,
   fullWidth = true,
+  color,
+  pill = false,
+  glow,
   children,
   style,
 }: ButtonProps) {
   const theme = useTheme();
 
-  // Vantage spec: pill (radius 999) for every CTA, size 'xl' = 56pt for
-  // primary actions, 'lg' = 48pt for secondary white CTAs.
-  const height = size === 'sm' ? 36 : size === 'md' ? 44 : size === 'lg' ? 48 : theme.hitTargets.buyButton;
-  const paddingH = size === 'sm' ? 16 : size === 'md' ? 20 : 24;
+  // Tightened buttons: smaller radius, less padding, slightly smaller text.
+  const height = size === 'sm' ? 32 : size === 'md' ? 40 : size === 'lg' ? 44 : 50;
+  const paddingH = size === 'sm' ? 12 : size === 'md' ? 14 : 16;
+  const fontSize = size === 'xl' ? 15 : 13;
 
   const palette = (() => {
     switch (variant) {
@@ -58,6 +68,11 @@ export function Button({
 
   const inactive = disabled || loading;
 
+  // Coloured CTAs get a soft glow in dark mode (matches the reference design).
+  const colouredVariant = variant === 'primary' || variant === 'buy' || variant === 'sell' || variant === 'danger' || !!color;
+  const glowOn = (glow ?? (theme.scheme === 'dark' && colouredVariant)) && !inactive;
+  const glowColor = color ?? (variant === 'sell' || variant === 'danger' ? theme.colors.sell : theme.colors.buy);
+
   return (
     <Pressable
       onPress={inactive ? undefined : onPress}
@@ -67,10 +82,10 @@ export function Button({
         {
           height,
           paddingHorizontal: paddingH,
-          borderRadius: theme.radius.pill,
-          backgroundColor: palette.bg,
+          borderRadius: pill ? 999 : 10,
+          backgroundColor: color ?? palette.bg,
           borderWidth: 1,
-          borderColor: palette.border,
+          borderColor: color ?? palette.border,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
@@ -78,6 +93,13 @@ export function Button({
           flexDirection: 'row',
           gap: 8,
         },
+        glowOn ? {
+          shadowColor: glowColor,
+          shadowOpacity: 0.55,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 8,
+        } : null,
         style as ViewStyle,
       ]}
     >
@@ -88,7 +110,7 @@ export function Button({
           <Text
             variant={size === 'xl' ? 'bodyLg' : 'bodyMd'}
             weight="bold"
-            style={{ color: palette.fg }}
+            style={{ color: palette.fg, fontSize }}
           >
             {children}
           </Text>

@@ -3,104 +3,112 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   User as UserIcon, LayoutGrid, Plus, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft,
-  History, FileText, Download, Users, PiggyBank, CalendarClock, ShieldCheck,
-  Sparkles, Share2, Gift, BadgeCheck, KeyRound, Smartphone, Bell, Languages, Moon,
-  HelpCircle, MessageCircle, LogOut, ChevronRight, Award,
+  History, FileText, Download, CalendarClock, ShieldCheck,
+  Share2, Bell, Moon,
+  HelpCircle, MessageCircle, LogOut, ChevronRight, Calculator, Briefcase,
+  PieChart, GraduationCap, Newspaper, Network, TrendingUp, Scale,
 } from 'lucide-react-native';
-import { Text, Divider, Pressable } from '@/ui';
+import { Text, Divider, Pressable, GradientBackground } from '@/ui';
 import { useTheme } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
+import { useThemeStore, type ThemeMode } from '@/stores/themeStore';
 
-interface Row { icon: React.ReactNode; label: string; hint?: string; onPress: () => void; danger?: boolean }
+const THEME_LABEL: Record<ThemeMode, string> = { light: 'Light', dark: 'Dark' };
+const THEME_NEXT: Record<ThemeMode, ThemeMode> = { dark: 'light', light: 'dark' };
+// Sign-out stays red (destructive action) even though the theme is green.
+const DANGER_RED = '#FF2D55';
+
+type IconType = typeof UserIcon;
+interface Row { Icon: IconType; label: string; hint?: string; onPress: () => void; danger?: boolean }
 interface Section { title: string; items: Row[] }
 
-/** Vantage-style More tab — profile header + grouped sections w/ dividers. */
+/** More tab — mirrors the swisdex.com web sidebar: dark surface, plain
+ *  green line icons (no tinted circles), white labels. Sign out is red. */
 export default function MoreTab() {
   const theme = useTheme();
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
   const unread = useNotificationsStore((s) => s.unread);
-
-  const icon = (Component: typeof UserIcon, color?: string) => (
-    <Component size={20} color={color ?? theme.colors.text.primary} strokeWidth={1.75} />
-  );
+  const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
 
   const sections: Section[] = [
     {
       title: 'Account',
       items: [
-        { icon: icon(LayoutGrid), label: 'My accounts', hint: 'View, switch, open new', onPress: () => router.push('/accounts') },
-        { icon: icon(Plus), label: 'Open new account', onPress: () => router.push('/accounts/open') },
+        { Icon: LayoutGrid, label: 'My accounts', hint: 'View, switch, open new', onPress: () => router.push('/accounts') },
+        { Icon: Plus, label: 'Open new account', onPress: () => router.push('/accounts/open') },
       ],
     },
     {
       title: 'Funds',
       items: [
-        { icon: icon(ArrowDownToLine, theme.colors.buy), label: 'Deposit', onPress: () => router.push('/wallet/deposit') },
-        { icon: icon(ArrowUpFromLine, theme.colors.sell), label: 'Withdraw', onPress: () => router.push('/wallet/withdraw') },
-        { icon: icon(ArrowRightLeft), label: 'Transfer', onPress: () => router.push('/wallet/transfer') },
+        { Icon: ArrowDownToLine, label: 'Deposit', onPress: () => router.push('/wallet/deposit') },
+        { Icon: ArrowUpFromLine, label: 'Withdraw', onPress: () => router.push('/wallet/withdraw') },
+        { Icon: ArrowRightLeft, label: 'Transfer', onPress: () => router.push('/wallet/transfer') },
+        { Icon: History, label: 'Transactions', onPress: () => router.push('/wallet/transactions') },
+      ],
+    },
+    {
+      title: 'Discover',
+      items: [
+        { Icon: PieChart, label: 'Portfolio', onPress: () => router.push('/portfolio') },
+        { Icon: Newspaper, label: 'Economic News', onPress: () => router.push('/news') },
+        { Icon: GraduationCap, label: 'SwisDex Academy', onPress: () => router.push('/academy' as never) },
       ],
     },
     {
       title: 'Trading',
       items: [
-        { icon: icon(History), label: 'Trade history', onPress: () => router.push('/portfolio-history') },
-        { icon: icon(FileText), label: 'Statement / Reports', onPress: () => router.push('/portfolio-history') },
-        { icon: icon(Download), label: 'Export data', onPress: () => router.push('/portfolio-export') },
+        { Icon: History, label: 'Trade history', onPress: () => router.push('/portfolio-history') },
+        { Icon: FileText, label: 'Statement / Reports', onPress: () => router.push('/statement') },
+        { Icon: Calculator, label: 'Risk calculator', onPress: () => router.push('/risk-calculator') },
+        { Icon: Download, label: 'Export data', onPress: () => router.push('/portfolio-export') },
       ],
     },
     {
       title: 'Earn',
       items: [
-        { icon: icon(Users), label: 'Copy trading', onPress: () => router.push('/earn/copy') },
-        { icon: icon(PiggyBank), label: 'Staking', onPress: () => router.push('/earn/staking') },
-        { icon: icon(CalendarClock), label: 'Fixed return', onPress: () => router.push('/earn/fixed-return') },
-        { icon: icon(ShieldCheck), label: 'Trade insurance', onPress: () => router.push('/earn/insurance') },
+        { Icon: Share2, label: 'Referral', onPress: () => router.push('/earn/referral') },
+        { Icon: CalendarClock, label: 'Fixed Return', onPress: () => router.push('/earn/fixed-return') },
       ],
     },
     {
-      title: 'Rewards',
+      title: 'Managed & Partners',
       items: [
-        { icon: icon(Sparkles, theme.colors.buy), label: 'Rewards & XP', onPress: () => router.push('/earn/rewards') },
-        { icon: icon(Share2), label: 'Refer & earn', onPress: () => router.push('/earn/referral') },
-        { icon: icon(Gift), label: 'Promotions', onPress: () => router.push('/earn') },
-      ],
-    },
-    {
-      title: 'Account & Security',
-      items: [
-        { icon: icon(BadgeCheck), label: 'KYC / Verification', hint: user?.kyc_status ? `Status: ${user.kyc_status}` : undefined, onPress: () => router.push('/kyc') },
-        { icon: icon(KeyRound), label: 'Two-factor auth', hint: user?.two_factor_enabled ? 'Enabled' : 'Disabled', onPress: () => router.push('/profile') },
-        { icon: icon(Award), label: 'Change password', onPress: () => router.push('/profile-password') },
-        { icon: icon(Smartphone), label: 'Active sessions', onPress: () => router.push('/sessions') },
+        { Icon: ShieldCheck, label: 'Trade Insurance', onPress: () => router.push('/earn/insurance') },
+        { Icon: TrendingUp, label: 'PAMM', hint: 'Pooled managed accounts', onPress: () => router.push('/earn/pamm') },
+        { Icon: Network, label: 'MAMM', hint: 'Multi-account manager', onPress: () => router.push('/social') },
+        { Icon: Briefcase, label: 'Affiliates', hint: 'Introducing broker dashboard', onPress: () => router.push('/business') },
       ],
     },
     {
       title: 'Inbox & Settings',
       items: [
-        { icon: icon(Bell), label: 'Inbox', hint: unread > 0 ? `${unread} unread` : undefined, onPress: () => router.push('/inbox') },
-        { icon: icon(Languages), label: 'Language', hint: user?.language ?? 'en', onPress: () => router.push('/profile') },
-        { icon: icon(Moon), label: 'Theme', hint: 'Dark', onPress: () => {} },
+        { Icon: Bell, label: 'Inbox', hint: unread > 0 ? `${unread} unread` : undefined, onPress: () => router.push('/inbox') },
+        { Icon: Moon, label: 'Theme', hint: THEME_LABEL[themeMode], onPress: () => { void setThemeMode(THEME_NEXT[themeMode]); } },
       ],
     },
     {
       title: 'Support',
       items: [
-        { icon: icon(HelpCircle), label: 'Help center', onPress: () => router.push('/support') },
-        { icon: icon(MessageCircle), label: 'Contact support', onPress: () => router.push('/support/new') },
+        { Icon: HelpCircle, label: 'Get Support', onPress: () => router.push('/support') },
+        { Icon: MessageCircle, label: 'Contact support', onPress: () => router.push('/support/new') },
+        { Icon: Scale, label: 'Terms & Conditions', onPress: () => router.push('/terms' as never) },
       ],
     },
     {
       title: '',
       items: [
-        { icon: icon(LogOut, theme.colors.sell), label: 'Sign out', danger: true, onPress: () => { void signOut(); } },
+        { Icon: LogOut, label: 'Sign out', danger: true, onPress: () => { void signOut(); } },
       ],
     },
   ];
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <GradientBackground>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingBottom: theme.hitTargets.tabBarBottom + theme.spacing[6] }}>
         {/* Profile card */}
         <Pressable
@@ -170,9 +178,13 @@ export default function MoreTab() {
                       gap: theme.spacing[3],
                     })}
                   >
-                    {item.icon}
+                    <item.Icon
+                      size={22}
+                      color={item.danger ? DANGER_RED : theme.colors.buy}
+                      strokeWidth={1.85}
+                    />
                     <View style={{ flex: 1 }}>
-                      <Text variant="bodyLg" style={item.danger ? { color: theme.colors.sell } : undefined}>
+                      <Text variant="bodyLg" style={item.danger ? { color: DANGER_RED } : undefined}>
                         {item.label}
                       </Text>
                       {item.hint ? (
@@ -181,7 +193,7 @@ export default function MoreTab() {
                     </View>
                     {!item.danger ? <ChevronRight size={16} color={theme.colors.text.tertiary} /> : null}
                   </Pressable>
-                  {idx < section.items.length - 1 ? <Divider inset={theme.spacing[4] + 20 + theme.spacing[3]} /> : null}
+                  {idx < section.items.length - 1 ? <Divider inset={theme.spacing[4] + 22 + theme.spacing[3]} /> : null}
                 </View>
               ))}
             </View>
@@ -189,5 +201,6 @@ export default function MoreTab() {
         ))}
       </ScrollView>
     </SafeAreaView>
+    </GradientBackground>
   );
 }

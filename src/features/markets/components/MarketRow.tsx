@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { Text, Num, Pressable } from '@/ui';
 import { useTheme } from '@/theme';
 import { Sparkline } from '@/shared/components/Sparkline';
+import { InstrumentIcon } from './InstrumentIcon';
 import { useMarketDataStore } from '@/stores/marketDataStore';
 import type { InstrumentInfo } from '@/types/market';
 
@@ -13,13 +14,15 @@ interface MarketRowProps {
   onPress?: () => void;
 }
 
+// Green-only theme: category chips use distinct GREEN shades instead of
+// a rainbow of hues, so the app stays one green family.
 const CATEGORY_COLORS: Record<string, string> = {
-  metals: '#F59E0B',
-  crypto: '#FB923C',
-  indices: '#3B82F6',
-  forex: '#A78BFA',
-  stocks: '#06B6D4',
-  commodities: '#10B981',
+  metals: '#6bc93b',
+  crypto: '#55a630',
+  indices: '#3f7c24',
+  forex: '#8BC34A',
+  stocks: '#2E9D52',
+  commodities: '#1E7A3C',
 };
 
 /** Vantage-style market row: icon | symbol+category chip | sparkline | price+change.
@@ -54,17 +57,8 @@ export function MarketRow({ symbol, instrument, sparkline, onPress }: MarketRowP
         minHeight: 64,
       })}
     >
-      {/* Symbol + segment chip */}
-      <View
-        style={{
-          width: 36, height: 36,
-          borderRadius: theme.radius.pill,
-          backgroundColor: theme.colors.bg.chip,
-          alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <Text variant="labelXs" tone="secondary">{symbol.slice(0, 3)}</Text>
-      </View>
+      {/* Instrument logo — flag pair (forex) / coin (crypto) / metal / code */}
+      <InstrumentIcon symbol={symbol} segment={segment} size={36} />
 
       <View style={{ flex: 1, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}>

@@ -19,6 +19,12 @@ let inFlight: Promise<StoredTokens | null> | null = null;
 async function doRefresh(): Promise<StoredTokens | null> {
   const current = await loadTokens();
   if (!current) return null;
+  if (!current.refresh) {
+    // No refresh token (cookie-mode gateway, pt_refresh wasn't readable).
+    // Can't renew the session — drop to login so the user re-auths.
+    await clearTokens();
+    return null;
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), apiConfig.requestTimeoutMs);

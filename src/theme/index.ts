@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { useThemeStore } from '@/stores/themeStore';
 import { darkColors, lightColors, type ColorScheme } from './colors';
 import { textStyles, sizes, weights, type TextVariant } from './typography';
 import { spacing, radius, hitTargets } from './spacing';
@@ -36,11 +36,11 @@ const lightTheme: Theme = {
   hitTargets,
 };
 
-/** Resolve the active theme from the OS color scheme. Dark is the default —
- *  matches the web trader and CLAUDE.md's "near-black #08090b" canon. */
+/** Resolve the active theme from the user's choice — dark or light only.
+ *  Dark is the default (web-trader / CLAUDE.md "near-black #08090b" canon). */
 export function useTheme(): Theme {
-  const scheme = useColorScheme();
-  return scheme === 'light' ? lightTheme : darkTheme;
+  const mode = useThemeStore((s) => s.mode);
+  return mode === 'light' ? lightTheme : darkTheme;
 }
 
 export { darkTheme, lightTheme };

@@ -19,7 +19,7 @@ export default function NewTicketScreen() {
     if (!subject.trim() || !body.trim()) return setError('Subject and message are required.');
     setSubmitting(true);
     try {
-      const t = await supportApi.createTicket({ subject: subject.trim(), body: body.trim() });
+      const t = await supportApi.createTicket({ subject: subject.trim(), message: body.trim() });
       router.replace({ pathname: '/support/[id]', params: { id: t.id } });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not create ticket.');

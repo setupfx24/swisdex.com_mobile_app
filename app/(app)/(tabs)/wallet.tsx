@@ -3,42 +3,94 @@ import { View, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
-  ChevronDown, Eye, Search, MessageCircle,
+  ChevronDown, Eye, Search, MessageCircle, Clock,
   ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, History,
   ShieldCheck, Lock, BadgeCheck,
 } from 'lucide-react-native';
-import { Text, Num, Pressable, Button, Divider, SkeletonRow } from '@/ui';
+import { Text, Num, Pressable, Button, Divider, SkeletonRow, GradientBackground } from '@/ui';
 import { useTheme } from '@/theme';
-import { useAuthStore } from '@/stores/authStore';
 import { walletApi } from '@/lib/api/wallet';
 import { QuickActionGrid } from '@/shared/components/QuickActionGrid';
 import type { WalletTransaction } from '@/types/wallet';
+
+/** Live wallet summary derived from GET /wallet/summary (mirrors the web
+ *  trader's wallet page) plus a pending-withdrawals count from
+ *  GET /wallet/withdrawals. */
+interface WalletState {
+  mainBalance: number;
+  bonus: number;
+  totalDeposited: number;
+  totalWithdrawn: number;
+  pendingWithdrawals: number;
+}
+
+const EMPTY_WALLET: WalletState = {
+  mainBalance: 0,
+  bonus: 0,
+  totalDeposited: 0,
+  totalWithdrawn: 0,
+  pendingWithdrawals: 0,
+};
 
 /** Vantage-style Wallet — hero balance + 4-up actions + recent ledger.
  *  Empty state shows the broker-trust illustration card + open-account CTA. */
 export default function WalletTab() {
   const theme = useTheme();
-  const user = useAuthStore((s) => s.user);
   const [txs, setTxs] = useState<WalletTransaction[] | null>(null);
+  const [wallet, setWallet] = useState<WalletState | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
 
   const load = async () => {
-    try {
-      const r = await walletApi.transactions({ page: 1, per_page: 8 });
-      setTxs(r.items);
-    } catch {
-      setTxs([]);
+    // Fetch summary, withdrawals (pending count) and the recent ledger together.
+    // Each is best-effort — a failure in one shouldn't blank the others.
+    const [summaryRes, wdRes, txRes] = await Promise.allSettled([
+      walletApi.summary(),
+      walletApi.listWithdrawals(),
+      walletApi.transactions({ page: 1, per_page: 8 }),
+    ]);
+
+    if (summaryRes.status === 'fulfilled') {
+      const s = summaryRes.value;
+      // Pending withdrawals — count rows whose status is "pending".
+      // Shape is best-effort: the endpoint may return an array or a paged
+      // { items } envelope, so handle both and skip silently otherwise.
+      let pending = 0;
+      if (wdRes.status === 'fulfilled') {
+        const raw = wdRes.value as unknown;
+        const list = Array.isArray(raw)
+          ? raw
+          : Array.isArray((raw as { items?: unknown }).items)
+            ? (raw as { items: unknown[] }).items
+            : [];
+        pending = list.filter(
+          (w) => String((w as { status?: string }).status ?? '').toLowerCase() === 'pending',
+        ).length;
+      }
+      setWallet({
+        mainBalance: Number(s.main_wallet_balance) || 0,
+        bonus: Number(s.main_wallet_bonus) || 0,
+        totalDeposited: Number(s.total_deposited) || 0,
+        totalWithdrawn: Number(s.total_withdrawn) || 0,
+        pendingWithdrawals: pending,
+      });
+    } else {
+      setWallet((prev) => prev ?? EMPTY_WALLET);
     }
+
+    setTxs(txRes.status === 'fulfilled' ? txRes.value.items : []);
   };
 
   useEffect(() => { void load(); }, []);
 
-  const balance = user?.main_wallet_balance ?? 0;
-  const isEmpty = balance === 0 && (txs?.length ?? 0) === 0;
+  const balance = wallet?.mainBalance ?? 0;
+  const bonus = wallet?.bonus ?? 0;
+  const pending = wallet?.pendingWithdrawals ?? 0;
+  const isEmpty = balance === 0 && bonus === 0 && (txs?.length ?? 0) === 0;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <GradientBackground>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       {/* Header */}
       <View
         style={{
@@ -67,10 +119,10 @@ export default function WalletTab() {
           />
         }
       >
-        {/* Total Balance hero */}
+        {/* Main wallet balance hero */}
         <View style={{ paddingHorizontal: theme.spacing[4], paddingTop: theme.spacing[2], gap: theme.spacing[1] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}>
-            <Text variant="bodyMd" tone="secondary">Total Balance</Text>
+            <Text variant="bodyMd" tone="secondary">Main Wallet</Text>
             <Pressable
               haptic="light"
               onPress={() => setShowBalance((v) => !v)}
@@ -78,6 +130,23 @@ export default function WalletTab() {
             >
               <Eye size={16} color={theme.colors.text.secondary} strokeWidth={1.75} />
             </Pressable>
+            {pending > 0 ? (
+              <View
+                style={{
+                  marginLeft: 'auto',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing['0.5'],
+                  paddingHorizontal: theme.spacing[2],
+                  paddingVertical: theme.spacing['0.5'],
+                  borderRadius: theme.radius.full,
+                  backgroundColor: theme.colors.bg.chip,
+                }}
+              >
+                <Clock size={12} color={theme.colors.warning} strokeWidth={2} />
+                <Text variant="labelXs" tone="warning">{pending} pending</Text>
+              </View>
+            ) : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
             {showBalance ? (
@@ -90,7 +159,51 @@ export default function WalletTab() {
               <ChevronDown size={14} color={theme.colors.text.secondary} strokeWidth={2} />
             </View>
           </View>
-          <Text variant="bodyMd" tone="secondary">Today's PnL 0.00 USD</Text>
+
+          {/* Bonus credit — tradeable but not withdrawable (cleared on first
+              approved withdrawal). Only shown when there's bonus on file. */}
+          {bonus > 0 ? (
+            <View
+              style={{
+                marginTop: theme.spacing[1],
+                padding: theme.spacing[3],
+                borderRadius: theme.radius.md,
+                borderWidth: 1,
+                borderColor: theme.colors.border.accent,
+                backgroundColor: theme.colors.buyBg,
+                gap: theme.spacing['0.5'],
+              }}
+            >
+              <Text variant="labelXs" tone="accent">Bonus credit</Text>
+              <Num value={bonus} digits={2} suffix="USD" variant="numLg" tone="accent" />
+              <Text variant="body" tone="tertiary">
+                Tradeable, not withdrawable. Cleared on first withdrawal.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Total Deposited / Total Withdrawn */}
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: theme.spacing[3],
+            paddingHorizontal: theme.spacing[4],
+            paddingTop: theme.spacing[4],
+          }}
+        >
+          <StatCard
+            theme={theme}
+            label="Total Deposited"
+            value={wallet?.totalDeposited ?? 0}
+            tone="buy"
+          />
+          <StatCard
+            theme={theme}
+            label="Total Withdrawn"
+            value={wallet?.totalWithdrawn ?? 0}
+            tone="secondary"
+          />
         </View>
 
         {/* Quick actions */}
@@ -195,6 +308,36 @@ export default function WalletTab() {
         )}
       </ScrollView>
     </SafeAreaView>
+    </GradientBackground>
+  );
+}
+
+function StatCard({
+  theme,
+  label,
+  value,
+  tone,
+}: {
+  theme: ReturnType<typeof useTheme>;
+  label: string;
+  value: number;
+  tone: 'buy' | 'secondary';
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        padding: theme.spacing[3],
+        borderRadius: theme.radius.md,
+        backgroundColor: theme.colors.bg.secondary,
+        borderWidth: 1,
+        borderColor: theme.colors.border.primary,
+        gap: theme.spacing['0.5'],
+      }}
+    >
+      <Text variant="labelXs" tone="tertiary">{label}</Text>
+      <Num value={value} digits={2} suffix="USD" variant="numLg" tone={tone} />
+    </View>
   );
 }
 

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Text, Num, Divider, Field, Button } from '@/ui';
+import { Text, Num, Money, Divider, Field, Button } from '@/ui';
 import { useTheme } from '@/theme';
+import { isCentAccount } from '@/lib/money';
 import { accountsApi } from '@/lib/api/accounts';
 import { useAccountsStore } from '@/stores/accountsStore';
 import type { AccountSummary } from '@/types/accounts';
@@ -80,6 +81,8 @@ export default function AccountDetailScreen() {
     );
   };
 
+  const cent = isCentAccount(account);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
       <Stack.Screen options={{ title: `#${account.account_number}` }} />
@@ -88,8 +91,8 @@ export default function AccountDetailScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[8] }} keyboardShouldPersistTaps="handled">
           <View style={{ paddingHorizontal: theme.spacing[4], paddingVertical: theme.spacing[3], gap: theme.spacing[2] }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
-              <Num value={account.equity} digits={2} variant="numXxl" />
-              <Text variant="bodyMd" tone="tertiary">{account.currency}</Text>
+              <Money value={account.equity} isCent={cent} variant="numXxl" />
+              <Text variant="bodyMd" tone="tertiary">{cent ? 'Cent' : account.currency}</Text>
             </View>
             <Text variant="body" tone="tertiary">
               {account.is_demo ? 'Demo' : 'Live'} · {account.account_group?.name ?? 'Standard'} · 1:{account.leverage}
@@ -97,12 +100,12 @@ export default function AccountDetailScreen() {
           </View>
           <Divider />
 
-          <SummaryRow label="Balance" value={summary?.balance ?? account.balance} digits={2} />
-          <SummaryRow label="Credit" value={summary?.credit ?? account.credit} digits={2} />
-          <SummaryRow label="Margin used" value={summary?.margin_used ?? account.margin_used} digits={2} />
-          <SummaryRow label="Free margin" value={summary?.free_margin ?? account.free_margin} digits={2} />
+          <SummaryRow label="Balance" value={summary?.balance ?? account.balance} digits={2} money isCent={cent} />
+          <SummaryRow label="Credit" value={summary?.credit ?? account.credit} digits={2} money isCent={cent} />
+          <SummaryRow label="Margin used" value={summary?.margin_used ?? account.margin_used} digits={2} money isCent={cent} />
+          <SummaryRow label="Free margin" value={summary?.free_margin ?? account.free_margin} digits={2} money isCent={cent} />
           <SummaryRow label="Margin level" value={summary?.margin_level ?? account.margin_level} digits={2} suffix="%" />
-          {summary ? <SummaryRow label="Unrealized P&L" value={summary.unrealized_pnl} digits={2} pnl /> : null}
+          {summary ? <SummaryRow label="Unrealized P&L" value={summary.unrealized_pnl} digits={2} pnl money isCent={cent} /> : null}
           {summary ? <SummaryRow label="Open positions" value={summary.open_positions_count} digits={0} /> : null}
 
           <View style={{ height: theme.spacing[6] }} />
@@ -138,12 +141,17 @@ function SummaryRow({
   digits,
   pnl,
   suffix,
+  money,
+  isCent,
 }: {
   label: string;
   value: number;
   digits: number;
   pnl?: boolean;
   suffix?: string;
+  /** Money row → cent-aware (¢/$); otherwise plain number (%, count). */
+  money?: boolean;
+  isCent?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -158,7 +166,11 @@ function SummaryRow({
         }}
       >
         <Text variant="body" tone="secondary">{label}</Text>
-        <Num value={value} digits={digits} pnl={pnl} suffix={suffix} variant="num" />
+        {money ? (
+          <Money value={value} isCent={isCent} pnl={pnl} variant="num" />
+        ) : (
+          <Num value={value} digits={digits} pnl={pnl} suffix={suffix} variant="num" />
+        )}
       </View>
       <Divider inset={theme.spacing[4]} />
     </>

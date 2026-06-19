@@ -23,13 +23,16 @@ export async function loadTokens(): Promise<StoredTokens | null> {
     SecureStore.getItemAsync(KEY_REFRESH),
     SecureStore.getItemAsync(KEY_EXPIRES),
   ]);
-  if (!access || !refresh) return null;
+  // Access token is required; refresh may be absent when the gateway runs in
+  // cookie mode and we couldn't lift pt_refresh from the login Set-Cookie.
+  // The session still works on the access token until it expires.
+  if (!access) return null;
   const accessExpiresAtMs = Number(expiresRaw);
   // Treat a corrupt timestamp as "expired now" — refresh.ts will trigger a
   // refresh before the next request, recovering cleanly.
   return {
     access,
-    refresh,
+    refresh: refresh ?? '',
     accessExpiresAtMs: Number.isFinite(accessExpiresAtMs) ? accessExpiresAtMs : 0,
   };
 }
@@ -62,11 +65,11 @@ export function tokensFromAuthResponse(res: {
   refresh_token: string | null;
   expires_at: string;
 }): StoredTokens | null {
-  if (!res.access_token || !res.refresh_token) return null;
+  if (!res.access_token) return null;
   const t = Date.parse(res.expires_at);
   return {
     access: res.access_token,
-    refresh: res.refresh_token,
+    refresh: res.refresh_token ?? '',
     accessExpiresAtMs: Number.isFinite(t) ? t : Date.now() + 30 * 60_000,
   };
 }

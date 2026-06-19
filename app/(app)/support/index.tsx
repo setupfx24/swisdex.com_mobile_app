@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
-import { format } from 'date-fns';
 import { Plus } from 'lucide-react-native';
 import { Text, Divider, Pressable, Button, SkeletonRow } from '@/ui';
 import { useTheme } from '@/theme';
+import { safeFormat } from '@/lib/date';
 import { supportApi } from '@/lib/api/support';
 import type { SupportTicket } from '@/types/notifications';
 import { ProfileHeader } from '../profile';
@@ -67,7 +67,7 @@ export default function SupportListScreen() {
                   </Text>
                 ) : null}
                 <Text variant="labelXs" tone="tertiary" style={{ marginTop: 2 }}>
-                  Updated {format(new Date(t.updated_at), 'MMM d, HH:mm')}
+                  Updated {safeFormat(t.updated_at)}
                 </Text>
               </Pressable>
               <Divider inset={theme.spacing[4]} />

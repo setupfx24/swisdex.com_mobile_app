@@ -8,25 +8,27 @@ import {
   ShieldCheck,
   Users,
   Award,
+  ShoppingBag,
+  Trophy,
+  Gamepad2,
+  Layers,
   ChevronRight,
 } from 'lucide-react-native';
 import { Text, Divider, Pressable } from '@/ui';
 import { useTheme } from '@/theme';
 import { ProfileHeader } from '../profile';
 
-const ROWS: { key: string; label: string; hint: string; icon: 'sparkles' | 'piggy' | 'calendar' | 'shield' | 'users' | 'award'; path: string }[] = [
-  { key: 'rewards',   label: 'Rewards',       hint: 'XP, Artha Coins, daily missions', icon: 'sparkles', path: '/earn/rewards' },
-  { key: 'staking',   label: 'Staking',       hint: 'Lock funds, earn APY',            icon: 'piggy',    path: '/earn/staking' },
-  { key: 'fixedret',  label: 'Fixed return',  hint: 'Tenure-based interest',           icon: 'calendar', path: '/earn/fixed-return' },
-  { key: 'insurance', label: 'Trade insurance', hint: 'Cap your downside',             icon: 'shield',   path: '/earn/insurance' },
-  { key: 'copy',      label: 'Copy trading',   hint: 'Follow top traders',              icon: 'users',    path: '/earn/copy' },
-  { key: 'referral',  label: 'Referral / IB',  hint: 'Refer friends, earn commission',  icon: 'award',    path: '/earn/referral' },
+type IconKey = 'sparkles' | 'piggy' | 'calendar' | 'shield' | 'users' | 'award' | 'store' | 'trophy' | 'play' | 'pamm';
+
+const ROWS: { key: string; label: string; hint: string; icon: IconKey; path: string }[] = [
+  { key: 'referral',  label: 'Referral',      hint: 'Refer friends, earn commission',  icon: 'award',    path: '/earn/referral' },
+  { key: 'fixedret',  label: 'Fixed Return',  hint: 'Tenure-based interest',           icon: 'calendar', path: '/earn/fixed-return' },
 ];
 
 export default function EarnHubScreen() {
   const theme = useTheme();
 
-  const iconFor = (key: typeof ROWS[number]['icon']) => {
+  const iconFor = (key: IconKey) => {
     const size = 18;
     const color = theme.colors.text.primary;
     const strokeWidth = 1.75;
@@ -37,6 +39,10 @@ export default function EarnHubScreen() {
       case 'shield':   return <ShieldCheck size={size} color={color} strokeWidth={strokeWidth} />;
       case 'users':    return <Users size={size} color={color} strokeWidth={strokeWidth} />;
       case 'award':    return <Award size={size} color={color} strokeWidth={strokeWidth} />;
+      case 'store':    return <ShoppingBag size={size} color={color} strokeWidth={strokeWidth} />;
+      case 'trophy':   return <Trophy size={size} color={color} strokeWidth={strokeWidth} />;
+      case 'play':     return <Gamepad2 size={size} color={color} strokeWidth={strokeWidth} />;
+      case 'pamm':     return <Layers size={size} color={color} strokeWidth={strokeWidth} />;
     }
   };
 

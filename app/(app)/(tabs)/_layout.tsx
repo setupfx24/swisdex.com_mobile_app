@@ -1,34 +1,52 @@
 import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  TrendingUp, ArrowLeftRight, Briefcase, Wallet as WalletIcon, Menu,
-} from 'lucide-react-native';
 import { useTheme } from '@/theme';
+import { AnimatedTabIcon } from '@/features/nav/AnimatedTabIcon';
+
+// Lottie sources per tab (authored green; retinted at runtime to follow the
+// theme — accent-green when focused, grey when not).
+const ICONS = {
+  markets: require('../../../assets/lottie/markets.json'),
+  trade: require('../../../assets/lottie/trade.json'),
+  portfolio: require('../../../assets/lottie/portfolio.json'),
+  wallet: require('../../../assets/lottie/wallet.json'),
+  more: require('../../../assets/lottie/more.json'),
+} as const;
 
 /** Floating pill bottom tab bar — Vantage's signature.
  *  Rounded pill ~16px from screen edges, hovers above safe area.
- *  Active tab gets accent-green icon + label; inactive stays grey. */
-function TabIcon({
-  Icon, focused, color,
-}: {
-  Icon: typeof TrendingUp;
-  focused: boolean;
-  color: string;
-}) {
-  return <Icon size={22} color={color} strokeWidth={focused ? 2.5 : 1.75} />;
-}
-
+ *  Each tab uses an animated Lottie glyph that plays on focus; active tab
+ *  is accent-green, inactive stays grey. */
 export default function TabsLayout() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const pillHeight = 64;
   const bottomMargin = Math.max(insets.bottom, 12);
 
+  const icon = (source: object) =>
+    ({ focused }: { focused: boolean }) => (
+      <AnimatedTabIcon
+        source={source}
+        focused={focused}
+        activeColor={theme.colors.buy}
+        inactiveColor={theme.colors.text.secondary}
+        size={28}
+      />
+    );
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        // Freeze (stop re-rendering) any tab that isn't focused. Every tab
+        // subscribes to the price socket, so without this a blurred Trade /
+        // Markets screen keeps re-rendering its rows on every tick while the
+        // user sits on another tab — wasted work that competes with the
+        // foreground screen for the JS thread.
+        freezeOnBlur: true,
+        lazy: true,
         tabBarShowLabel: true,
         tabBarActiveTintColor: theme.colors.buy,
         tabBarInactiveTintColor: theme.colors.text.secondary,
@@ -53,52 +71,31 @@ export default function TabsLayout() {
           backgroundColor: theme.colors.bg.secondary,
           borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: theme.colors.border.primary,
+          borderColor: theme.colors.bg.glassBorder,
           paddingHorizontal: 8,
           elevation: 12,
-          shadowColor: '#000',
-          shadowOpacity: 0.4,
+          shadowColor: theme.scheme === 'dark' ? theme.colors.buy : '#000',
+          shadowOpacity: theme.scheme === 'dark' ? 0.3 : 0.18,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: 8 },
         },
-        tabBarBackground: () => <View style={{ flex: 1, backgroundColor: 'transparent' }} />,
+        tabBarBackground: () => (
+          theme.scheme === 'dark' ? (
+            <View style={{ flex: 1, borderRadius: theme.radius.pill, overflow: 'hidden' }}>
+              <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.colors.bg.glass }]} />
+            </View>
+          ) : (
+            <View style={{ flex: 1, borderRadius: theme.radius.pill, backgroundColor: theme.colors.bg.primary }} />
+          )
+        ),
       }}
     >
-      <Tabs.Screen
-        name="markets"
-        options={{
-          title: 'Markets',
-          tabBarIcon: ({ color, focused }) => <TabIcon Icon={TrendingUp} focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="trade"
-        options={{
-          title: 'Trade',
-          tabBarIcon: ({ color, focused }) => <TabIcon Icon={ArrowLeftRight} focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="portfolio"
-        options={{
-          title: 'Portfolio',
-          tabBarIcon: ({ color, focused }) => <TabIcon Icon={Briefcase} focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="wallet"
-        options={{
-          title: 'Wallet',
-          tabBarIcon: ({ color, focused }) => <TabIcon Icon={WalletIcon} focused={focused} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'More',
-          tabBarIcon: ({ color, focused }) => <TabIcon Icon={Menu} focused={focused} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="markets" options={{ title: 'Markets', tabBarIcon: icon(ICONS.markets) }} />
+      <Tabs.Screen name="trade" options={{ title: 'Trade', tabBarIcon: icon(ICONS.trade) }} />
+      <Tabs.Screen name="portfolio" options={{ title: 'Portfolio', tabBarIcon: icon(ICONS.portfolio) }} />
+      <Tabs.Screen name="wallet" options={{ title: 'Wallet', tabBarIcon: icon(ICONS.wallet) }} />
+      <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon(ICONS.more) }} />
     </Tabs>
   );
 }

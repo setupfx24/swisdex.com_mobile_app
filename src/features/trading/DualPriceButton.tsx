@@ -8,6 +8,8 @@ interface DualPriceButtonProps {
   digits: number;
   /** Pip / fractional spread to render in the center chip. */
   spread?: number | string;
+  /** Highlights the chosen half and dims the other. The big CTA executes it. */
+  selected?: 'buy' | 'sell';
   onSell: () => void;
   onBuy: () => void;
   disabled?: boolean;
@@ -17,10 +19,13 @@ interface DualPriceButtonProps {
  *  and BUY (green, right half) inside a single pill, with a small
  *  spread chip overlaid at the center. Both halves are 72pt tall. */
 export function DualPriceButton({
-  bid, ask, digits, spread, onSell, onBuy, disabled = false,
+  bid, ask, digits, spread, selected, onSell, onBuy, disabled = false,
 }: DualPriceButtonProps) {
   const theme = useTheme();
   const inactive = disabled || bid == null || ask == null;
+  // Dim the half that isn't the chosen direction (only when a side is selected).
+  const sellDim = selected === 'buy';
+  const buyDim = selected === 'sell';
 
   return (
     <View style={{ position: 'relative', height: 72 }}>
@@ -43,7 +48,9 @@ export function DualPriceButton({
             justifyContent: 'center',
             paddingVertical: 12,
             paddingHorizontal: 24,
-            opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
+            opacity: inactive ? 0.5 : sellDim ? (pressed ? 0.4 : 0.45) : pressed ? 0.85 : 1,
+            borderWidth: selected === 'sell' ? 2.5 : 0,
+            borderColor: '#FFFFFF',
             gap: 2,
           })}
         >
@@ -62,7 +69,9 @@ export function DualPriceButton({
             justifyContent: 'center',
             paddingVertical: 12,
             paddingHorizontal: 24,
-            opacity: inactive ? 0.5 : pressed ? 0.85 : 1,
+            opacity: inactive ? 0.5 : buyDim ? (pressed ? 0.4 : 0.45) : pressed ? 0.85 : 1,
+            borderWidth: selected === 'buy' ? 2.5 : 0,
+            borderColor: '#FFFFFF',
             gap: 2,
           })}
         >

@@ -37,7 +37,7 @@ export function OrderSheet({ visible, onClose, symbol, digits, initialSide, init
     setError(null);
     if (!active) return setError('Pick an account first.');
     const lotsNum = parseFloat(lots);
-    if (!Number.isFinite(lotsNum) || lotsNum <= 0) return setError('Lots must be positive.');
+    if (!Number.isFinite(lotsNum) || lotsNum < 0.01) return setError('Minimum lot size is 0.01.');
     const priceNum = orderType === 'market' ? undefined : parseFloat(price);
     if (orderType !== 'market' && !Number.isFinite(priceNum)) return setError('Price required.');
     const stopLimitNum = orderType === 'stop_limit' ? parseFloat(stopLimit) : undefined;
@@ -163,10 +163,21 @@ export function OrderSheet({ visible, onClose, symbol, digits, initialSide, init
 
               <Field label="Lots" value={lots} onChangeText={setLots} keyboardType="decimal-pad" editable={!submitting} />
               {orderType !== 'market' ? (
-                <Field label="Price" value={price} onChangeText={setPrice} keyboardType="decimal-pad" editable={!submitting} />
+                <Field
+                  label={orderType === 'limit' ? 'Limit price' : 'Trigger price'}
+                  hint={
+                    orderType === 'limit'
+                      ? side === 'buy' ? 'Fills at or below this price' : 'Fills at or above this price'
+                      : side === 'buy' ? 'Fills when price rises through' : 'Fills when price falls through'
+                  }
+                  value={price}
+                  onChangeText={setPrice}
+                  keyboardType="decimal-pad"
+                  editable={!submitting}
+                />
               ) : null}
               {orderType === 'stop_limit' ? (
-                <Field label="Stop-limit price" value={stopLimit} onChangeText={setStopLimit} keyboardType="decimal-pad" editable={!submitting} />
+                <Field label="Limit price" hint="Limit applied once the trigger fires" value={stopLimit} onChangeText={setStopLimit} keyboardType="decimal-pad" editable={!submitting} />
               ) : null}
               <View style={{ flexDirection: 'row', gap: theme.spacing[3] }}>
                 <View style={{ flex: 1 }}>
@@ -185,7 +196,9 @@ export function OrderSheet({ visible, onClose, symbol, digits, initialSide, init
                 onPress={onSubmit}
                 loading={submitting}
               >
-                Place {side.toUpperCase()} order
+                {orderType === 'market'
+                  ? `${side.toUpperCase()} at market`
+                  : `Place ${side.toUpperCase()} ${orderType.replace('_', '-')}`}
               </Button>
             </ScrollView>
           </KeyboardAvoidingView>

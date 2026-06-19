@@ -68,12 +68,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   completeAuth: async (tokens) => {
     const stored = tokensFromAuthResponse(tokens);
     if (!stored) {
-      // Backend's JWT_INCLUDE_REFRESH_IN_JSON is off — mobile cannot work.
-      // Surface a clear message; the user can't fix this from the client.
-      throw new Error(
-        'Login succeeded but the gateway did not return a refresh token. ' +
-          'Ask the backend operator to set JWT_INCLUDE_REFRESH_IN_JSON=true.',
-      );
+      // Only fires if the gateway returned no access token at all — a real
+      // failure. (A missing refresh token no longer blocks login: the app
+      // runs on the access token and re-auths when it expires.)
+      throw new Error('Login succeeded but the gateway did not return an access token.');
     }
     await saveTokens(stored);
     const user = await api.get<User>('/auth/me');

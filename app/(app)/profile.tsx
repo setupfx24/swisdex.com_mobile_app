@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
-import { Text, Field, Button, Pressable } from '@/ui';
+import { ChevronLeft, ChevronRight, BadgeCheck, Award, Smartphone } from 'lucide-react-native';
+import { Text, Field, Button, Pressable, Divider } from '@/ui';
 import { useTheme } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { profileApi } from '@/lib/api/profile';
@@ -100,6 +100,39 @@ export default function ProfileScreen() {
           {saved ? <Text variant="body" tone="buy">Saved.</Text> : null}
 
           <Button onPress={onSave} loading={submitting} size="lg">Save</Button>
+
+          {/* Account & Security — moved here from the More tab. */}
+          <Text variant="labelXs" tone="tertiary" style={{ marginTop: theme.spacing[5] }}>ACCOUNT & SECURITY</Text>
+          <View style={{ borderRadius: theme.radius.lg, backgroundColor: theme.colors.bg.secondary, overflow: 'hidden' }}>
+            {[
+              { Icon: BadgeCheck, label: 'KYC / Verification', hint: user?.kyc_status ? `Status: ${user.kyc_status}` : undefined, onPress: () => router.push('/kyc') },
+              { Icon: Award, label: 'Change password', hint: undefined, onPress: () => router.push('/profile-password') },
+              { Icon: Smartphone, label: 'Active sessions', hint: undefined, onPress: () => router.push('/sessions') },
+            ].map((r, i, arr) => (
+              <View key={r.label}>
+                <Pressable
+                  haptic="light"
+                  onPress={r.onPress}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing[3],
+                    paddingHorizontal: theme.spacing[4],
+                    paddingVertical: theme.spacing[3],
+                    backgroundColor: pressed ? theme.colors.bg.tertiary : 'transparent',
+                  })}
+                >
+                  <r.Icon size={22} color={theme.colors.buy} strokeWidth={1.85} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyLg">{r.label}</Text>
+                    {r.hint ? <Text variant="bodyMd" tone="secondary">{r.hint}</Text> : null}
+                  </View>
+                  <ChevronRight size={16} color={theme.colors.text.tertiary} />
+                </Pressable>
+                {i < arr.length - 1 ? <Divider inset={theme.spacing[4] + 22 + theme.spacing[3]} /> : null}
+              </View>
+            ))}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

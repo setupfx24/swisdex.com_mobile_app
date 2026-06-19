@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, TextInput as RNTextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { format } from 'date-fns';
 import { Text, Divider, Button, SkeletonRow } from '@/ui';
 import { useTheme } from '@/theme';
+import { safeFormat } from '@/lib/date';
 import { supportApi } from '@/lib/api/support';
 import type { SupportMessage, SupportTicket } from '@/types/notifications';
 import { ProfileHeader } from '../profile';
@@ -45,7 +45,7 @@ export default function TicketDetailScreen() {
             <>
               <View style={{ paddingHorizontal: theme.spacing[4], paddingBottom: theme.spacing[2] }}>
                 <Text variant="labelXs" tone="accent">{ticket.status.replace('_', ' ').toUpperCase()}</Text>
-                <Text variant="labelXs" tone="tertiary">Opened {format(new Date(ticket.created_at), 'MMM d, HH:mm')}</Text>
+                <Text variant="labelXs" tone="tertiary">Opened {safeFormat(ticket.created_at)}</Text>
               </View>
               <Divider />
               {ticket.messages.map((m) => (
@@ -54,14 +54,14 @@ export default function TicketDetailScreen() {
                     style={{
                       paddingHorizontal: theme.spacing[4],
                       paddingVertical: theme.spacing[3],
-                      backgroundColor: m.sender === 'agent' ? theme.colors.bg.secondary : 'transparent',
+                      backgroundColor: m.is_admin ? theme.colors.bg.secondary : 'transparent',
                     }}
                   >
-                    <Text variant="labelXs" tone={m.sender === 'agent' ? 'accent' : 'tertiary'}>
-                      {m.sender === 'agent' ? 'SUPPORT' : 'YOU'} · {format(new Date(m.created_at), 'MMM d HH:mm')}
+                    <Text variant="labelXs" tone={m.is_admin ? 'accent' : 'tertiary'}>
+                      {m.is_admin ? 'SUPPORT' : 'YOU'} · {safeFormat(m.created_at, 'MMM d HH:mm')}
                     </Text>
                     <View style={{ height: 2 }} />
-                    <Text variant="bodyMd">{m.body}</Text>
+                    <Text variant="bodyMd">{m.message}</Text>
                   </View>
                   <Divider />
                 </View>

@@ -4,6 +4,7 @@ import { useMarketDataStore } from '@/stores/marketDataStore';
 import { Pressable, Text, Num } from '@/ui';
 import { useTheme } from '@/theme';
 import { Sparkline } from '@/shared/components/Sparkline';
+import { InstrumentIcon } from '@/features/markets/components/InstrumentIcon';
 import type { InstrumentInfo } from '@/types/market';
 
 interface Props {
@@ -45,10 +46,6 @@ export function MarketRow({ symbol, instrument, showSparkline = false, sparkline
     return { abs, pct, positive: abs >= 0 };
   }, [price, prev]);
 
-  // 1st char of symbol as a placeholder for the icon — real currency
-  // flags / crypto logos are a Phase-followup.
-  const iconLetter = symbol.slice(0, 1);
-
   return (
     <Pressable
       onPress={onPress}
@@ -63,15 +60,7 @@ export function MarketRow({ symbol, instrument, showSparkline = false, sparkline
         backgroundColor: pressed ? theme.colors.bg.hover : 'transparent',
       })}
     >
-      <View
-        style={{
-          width: 32, height: 32, borderRadius: 999,
-          backgroundColor: theme.colors.bg.tertiary,
-          alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <Text variant="bodyB" tone="primary" style={{ fontSize: 14 }}>{iconLetter}</Text>
-      </View>
+      <InstrumentIcon symbol={symbol} segment={segment} size={32} />
 
       <View style={{ flex: 1, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

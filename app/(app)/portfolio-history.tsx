@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { View, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
-import { format } from 'date-fns';
 import { Text, Num, Divider, SkeletonRow } from '@/ui';
 import { useTheme } from '@/theme';
+import { fmtLots } from '@/lib/format';
+import { safeFormat } from '@/lib/date';
 import { portfolioApi, type TradeRow } from '@/lib/api/portfolio';
 import { ProfileHeader } from './profile';
 
@@ -54,16 +55,16 @@ export default function PortfolioHistoryScreen() {
                       {item.side.toUpperCase()}
                     </Text>
                     <Text variant="bodyMd" weight="medium">{item.symbol}</Text>
-                    <Text variant="labelXs" tone="tertiary">{item.lots}</Text>
+                    <Text variant="labelXs" tone="tertiary">{fmtLots(item.lots)}</Text>
                   </View>
-                  <Num value={item.profit} digits={2} pnl signed variant="num" />
+                  <Num value={item.pnl} digits={2} pnl signed variant="num" />
                 </View>
                 <View style={{ flexDirection: 'row', gap: theme.spacing[3], marginTop: 2 }}>
                   <Text variant="labelXs" tone="tertiary">
                     {item.open_price} → {item.close_price}
                   </Text>
                   <Text variant="labelXs" tone="tertiary">
-                    {format(new Date(item.close_time), 'MMM d HH:mm')}
+                    {safeFormat(item.close_time, 'MMM d HH:mm')}
                   </Text>
                   {item.close_reason ? (
                     <Text variant="labelXs" tone="tertiary">{item.close_reason.toUpperCase()}</Text>

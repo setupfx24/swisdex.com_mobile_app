@@ -1,64 +1,100 @@
-// Scaffolded push-notification setup — DISABLED.
+// Push-notification wiring (mobile side READY).
 //
-// CLAUDE.md / audit: backend currently has NO FCM/APNs registration
-// endpoint. Until that lands, we poll for the unread badge via
-// notificationsStore.start() and surface alerts in-app only.
+// IMPORTANT: expo-notifications is imported DYNAMICALLY and only in a real
+// dev/production build. Expo Go (SDK 53+) removed remote push, and merely
+// IMPORTING expo-notifications there runs its TokenAutoRegistration side
+// effect, which logs the red "Use a development build" console error. By
+// not importing the module in Expo Go at all, that error never appears.
 //
-// When the backend ships POST /notifications/devices (or similar):
-//   1) Flip PUSH_BACKEND_READY to true.
-//   2) Implement registerDeviceToken to call the endpoint with the Expo
-//      push token + platform.
-//   3) Wire registerForPushNotificationsAsync into the app/_layout boot
-//      after authStore.bootstrap() completes.
-//
-// Test in Expo Go: expo-notifications local notifications work in Expo Go
-// for foreground display; push tokens require a development / production
-// build (Expo Go can't get a real push token in SDK 53+).
+// In a real build: requests permission → gets the Expo push token → POSTs it
+// to the backend (POST /notifications/devices) → routes notification taps to
+// the inbox. The backend register call is swallowed until that endpoint ships.
 
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { router } from 'expo-router';
+import api from '@/lib/api/client';
 
-export const PUSH_BACKEND_READY = false;
+// 'storeClient' === Expo Go. A dev/production build reports 'standalone'/'bare'.
+const IS_EXPO_GO = Constants.executionEnvironment === 'storeClient';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+export const PUSH_BACKEND_READY = true;
 
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (!Device.isDevice) return null;
+let responseSub: { remove: () => void } | null = null;
+
+/** Call once after the user is authenticated. No-op in Expo Go (expo-
+ *  notifications is never even imported there, so no console error). */
+export async function setupPushNotifications(): Promise<void> {
+  if (IS_EXPO_GO) return;
+
+  // Dynamic imports — these modules are only evaluated in a real build.
+  const Notifications = await import('expo-notifications');
+  const Device = await import('expo-device');
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+
+  if (!Device.isDevice) return;
+
   const { status: existing } = await Notifications.getPermissionsAsync();
   let status = existing;
   if (status !== 'granted') {
-    const req = await Notifications.requestPermissionsAsync();
-    status = req.status;
+    status = (await Notifications.requestPermissionsAsync()).status;
   }
-  if (status !== 'granted') return null;
+  if (status !== 'granted') return;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('trades', {
-      name: 'Trade activity',
-      importance: Notifications.AndroidImportance.DEFAULT,
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'SwisDex alerts',
+      importance: Notifications.AndroidImportance.HIGH,
       sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
     });
   }
 
   try {
-    const token = await Notifications.getExpoPushTokenAsync();
-    return token.data;
-  } catch {
-    return null;
+    // EAS build injects the projectId into expoConfig.extra.eas — pass it
+    // explicitly so getExpoPushTokenAsync never throws "No projectId found".
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId;
+    const token = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    if (token?.data && PUSH_BACKEND_READY) {
+      try {
+        await api.post('/notifications/devices', { expo_token: token.data, platform: Platform.OS });
+        console.log('[push] registered Expo token with backend:', token.data);
+      } catch (e) {
+        // Surface so it's visible in `adb logcat` — silent failure here was
+        // why "no push" was undebuggable.
+        console.warn('[push] backend device registration failed:', e);
+      }
+    } else {
+      console.warn('[push] no Expo push token returned');
+    }
+  } catch (e) {
+    // On Android this throws when Firebase/FCM is not configured
+    // (missing google-services.json / FCM V1 key). Log the real cause.
+    console.warn('[push] getExpoPushTokenAsync failed (FCM not configured?):', e);
+  }
+
+  if (!responseSub) {
+    responseSub = Notifications.addNotificationResponseReceivedListener(() => {
+      // Tapping a push opens the inbox (per-type deep-linking happens there).
+      try { router.push('/inbox' as never); } catch { /* router not ready */ }
+    });
   }
 }
 
-/** No-op until the backend endpoint exists. */
-export async function registerDeviceToken(_token: string): Promise<void> {
-  if (!PUSH_BACKEND_READY) return;
-  // TODO: POST /notifications/devices with { expo_token, platform }
+export function teardownPushNotifications(): void {
+  responseSub?.remove();
+  responseSub = null;
 }

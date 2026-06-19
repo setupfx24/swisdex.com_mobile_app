@@ -26,16 +26,19 @@ export interface SupportTicket {
   subject: string;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
   category?: string;
-  priority?: 'low' | 'normal' | 'high';
-  created_at: string;
-  updated_at: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  message_count?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
   last_message?: string;
 }
 
 export interface SupportMessage {
   id: string;
-  ticket_id: string;
-  sender: 'user' | 'agent';
-  body: string;
-  created_at: string;
+  ticket_id?: string;
+  /** Backend marks support-agent replies with is_admin = true. */
+  is_admin?: boolean;
+  message: string;
+  attachments?: unknown[] | null;
+  created_at?: string | null;
 }

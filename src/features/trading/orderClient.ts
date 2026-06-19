@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { ordersApi } from '@/lib/api/orders';
+import { insuranceApi } from '@/lib/api/earn';
 import { usePositionsStore } from '@/stores/positionsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMarketDataStore } from '@/stores/marketDataStore';
@@ -9,6 +10,12 @@ interface PlaceOptions {
   /** Best-effort optimistic injection for market orders — keeps the
    *  positions panel responsive while the network round-trip resolves. */
   optimistic?: boolean;
+  /** Trade insurance chosen on the order ticket. When set on a market order
+   *  that opens a position, we activate the policy on the new position_id
+   *  (mirrors the web OrderPanel: place order → activate on returned position). */
+  insuranceChoice?: { tier: string; fee: number } | null;
+  /** Surface an insurance-activation failure without failing the trade. */
+  onInsuranceError?: (msg: string) => void;
 }
 
 /** Place an order with the rules CLAUDE.md asks for:
@@ -60,6 +67,16 @@ export async function placeOrder(
   try {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     const res = await ordersApi.place(body);
+
+    // Attach trade insurance to the freshly-opened position (market only).
+    if (opts.insuranceChoice && res.position_id && body.order_type === 'market') {
+      try {
+        await insuranceApi.activate({ position_id: res.position_id, tier: opts.insuranceChoice.tier });
+      } catch (e) {
+        opts.onInsuranceError?.(e instanceof Error ? e.message : 'Insurance not activated.');
+      }
+    }
+
     // Reconcile with server-authoritative state in background.
     const active = useAccountsStore.getState().active;
     if (active) void usePositionsStore.getState().load(active.id);

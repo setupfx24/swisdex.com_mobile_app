@@ -26,7 +26,13 @@ export function useCandles(symbol: string, tf: TimeframeMeta): State {
       .bars(symbol, { resolution: tf.resolution, limit: HISTORY_BARS })
       .then((rows) => {
         if (cancelled) return;
-        const sorted = [...rows].sort((a, b) => a.time - b.time);
+        // Dedupe by timestamp — the gateway can return overlapping seeded +
+        // live-aggregated bars for the current period, which would otherwise
+        // produce two candles sharing a `time` (duplicate React key). Last
+        // write wins, then sort ascending.
+        const byTime = new Map<number, Candle>();
+        for (const r of rows) byTime.set(r.time, r);
+        const sorted = Array.from(byTime.values()).sort((a, b) => a.time - b.time);
         setState({ candles: sorted, loading: false, error: null });
       })
       .catch((e: unknown) => {
@@ -47,15 +53,27 @@ export function useCandles(symbol: string, tf: TimeframeMeta): State {
     if (!symbol) return;
     return barSocket.subscribe(symbol, tf.resolution, (bar) => {
       setState((s) => {
-        const last = s.candles[s.candles.length - 1];
+        const arr = s.candles;
+        const last = arr[arr.length - 1];
+        // Fast path: update to the current (last) bar.
         if (last && last.time === bar.time) {
-          // Same bar — replace in place.
-          const next = s.candles.slice(0, -1);
+          const next = arr.slice(0, -1);
           next.push(bar);
           return { ...s, candles: next };
         }
-        // New bar — append; trim front so memory doesn't grow unbounded.
-        const next = [...s.candles, bar];
+        // A bar for a timestamp we already hold (not the last one) — replace
+        // in place so we never end up with two candles sharing a `time`.
+        if (last && bar.time <= last.time) {
+          const idx = arr.findIndex((c) => c.time === bar.time);
+          if (idx !== -1) {
+            const next = arr.slice();
+            next[idx] = bar;
+            return { ...s, candles: next };
+          }
+          return s; // stale bar older than everything shown — ignore.
+        }
+        // Genuinely new, newer bar — append; trim front to bound memory.
+        const next = [...arr, bar];
         if (next.length > HISTORY_BARS * 2) next.splice(0, next.length - HISTORY_BARS * 2);
         return { ...s, candles: next };
       });

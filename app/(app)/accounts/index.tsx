@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
 import { View, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { Plus, Check } from 'lucide-react-native';
-import { Text, Num, Divider, Pressable, Button, SkeletonRow } from '@/ui';
+import { Text, Money, Divider, Pressable, Button, SkeletonRow } from '@/ui';
 import { useTheme } from '@/theme';
+import { isCentAccount } from '@/lib/money';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { ProfileHeader } from '../profile';
 import type { TradingAccount } from '@/types/accounts';
@@ -13,6 +14,14 @@ export default function AccountsListScreen() {
   const theme = useTheme();
   const { accounts, active, loading, error, load, setActive } = useAccountsStore();
   const [refreshing, setRefreshing] = useState(false);
+
+  // Always pull a fresh list when the screen comes into focus (e.g. right
+  // after opening a new account) so it never shows a stale empty state.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -70,6 +79,21 @@ export default function AccountsListScreen() {
   );
 }
 
+type Tone = 'accent' | 'warning' | 'buy' | 'tertiary';
+/** Account type from the account_number prefix — mirrors the web accounts page.
+ *  PM=PAMM pool, MM=MAM pool, CT=MAM master, CF=MAM, IF=investor sub-account,
+ *  PT/else=regular live. (IB is a user-level role, not an account type.) */
+function accountType(num: string): { label: string; tone: Tone } {
+  switch ((num || '').slice(0, 2).toUpperCase()) {
+    case 'PM': return { label: 'PAMM POOL', tone: 'accent' };
+    case 'MM': return { label: 'MAM POOL', tone: 'accent' };
+    case 'CT': return { label: 'MAM MASTER', tone: 'warning' };
+    case 'CF': return { label: 'MAM', tone: 'buy' };
+    case 'IF': return { label: 'INVESTMENT', tone: 'buy' };
+    default: return { label: 'LIVE', tone: 'tertiary' };
+  }
+}
+
 function AccountRow({
   account,
   selected,
@@ -82,6 +106,7 @@ function AccountRow({
   onOpen: () => void;
 }) {
   const theme = useTheme();
+  const type = accountType(account.account_number);
   return (
     <>
       <Pressable
@@ -95,21 +120,25 @@ function AccountRow({
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[3] }}>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2], flexWrap: 'wrap' }}>
               <Text variant="bodyMd" weight="medium">#{account.account_number}</Text>
               {account.is_demo ? (
                 <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: theme.colors.bg.tertiary }}>
                   <Text variant="labelXs" tone="tertiary">DEMO</Text>
                 </View>
-              ) : null}
+              ) : (
+                <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, backgroundColor: theme.colors.bg.chip }}>
+                  <Text variant="labelXs" tone={type.tone} weight="bold">{type.label}</Text>
+                </View>
+              )}
               {account.account_group ? (
                 <Text variant="labelXs" tone="tertiary">{account.account_group.name}</Text>
               ) : null}
             </View>
             <View style={{ height: 2 }} />
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
-              <Num value={account.equity} digits={2} variant="numLg" />
-              <Text variant="body" tone="tertiary">{account.currency} · 1:{account.leverage}</Text>
+              <Money value={account.equity} isCent={isCentAccount(account)} variant="numLg" />
+              <Text variant="body" tone="tertiary">{isCentAccount(account) ? 'Cent' : account.currency} · 1:{account.leverage}</Text>
             </View>
           </View>
 

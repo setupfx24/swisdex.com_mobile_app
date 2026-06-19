@@ -42,6 +42,9 @@ export interface OrderResponse {
   swap: number;
   comment?: string | null;
   created_at: string;
+  /** Set when a market order immediately opened a position — used to attach
+   *  trade insurance via POST /insurance/activate. */
+  position_id?: string | null;
 }
 
 export interface Position {

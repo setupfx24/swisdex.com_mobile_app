@@ -5,7 +5,8 @@ import { Link, router } from 'expo-router';
 import { Text, Field, Button } from '@/ui';
 import { useTheme } from '@/theme';
 import { authApi } from '@/lib/api/auth';
-import { ApiError, ApiNetworkError } from '@/lib/api';
+import { apiConfig, ApiError, ApiNetworkError } from '@/lib/api';
+import { TurnstileWidget } from '@/features/auth/TurnstileWidget';
 import type { PlatformStatus } from '@/types/auth';
 
 /** Email/password registration. On success the user is NOT signed in —
@@ -24,6 +25,10 @@ export default function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [allowed, setAllowed] = useState<PlatformStatus | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  // Bumped on captcha failure to remount the widget for a fresh challenge.
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const captchaEnabled = !!apiConfig.turnstileSiteKey;
 
   useEffect(() => {
     // Best-effort gate: if allow_new_registrations is off, hide the form
@@ -36,10 +41,21 @@ export default function RegisterScreen() {
       });
   }, []);
 
+  // Token arriving from the widget. Clear the "complete the captcha" hint the
+  // moment a token lands so the user never sees "Success!" next to that error.
+  const handleToken = (t: string) => {
+    setTurnstileToken(t);
+    if (t) setError((prev) => (prev && /captcha|complete the captcha/i.test(prev) ? null : prev));
+  };
+
   const onSubmit = async () => {
     setError(null);
     if (!email.trim() || password.length < 8 || !firstName.trim() || !lastName.trim()) {
       setError('Email, name, and an 8+ character password are required.');
+      return;
+    }
+    if (captchaEnabled && !turnstileToken) {
+      setError('Please complete the captcha below before continuing.');
       return;
     }
     setSubmitting(true);
@@ -50,15 +66,25 @@ export default function RegisterScreen() {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         referral_code: referral.trim() || undefined,
+        cf_turnstile_token: turnstileToken || undefined,
       });
       setSent(res.email);
     } catch (e: unknown) {
-      if (e instanceof ApiError) {
-        setError(e.message);
-      } else if (e instanceof ApiNetworkError) {
-        setError(e.message);
-      } else {
-        setError(e instanceof Error ? e.message : 'Could not register.');
+      const msg =
+        e instanceof ApiError || e instanceof ApiNetworkError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Could not register.';
+      setError(msg);
+      // Turnstile tokens are SINGLE-USE: the failed attempt already consumed
+      // this token (even when the failure was e.g. "email already registered").
+      // Re-submitting with the same token makes Cloudflare report a duplicate,
+      // which surfaces as a misleading "CAPTCHA verification failed". So after
+      // ANY failure, drop the token and remount the widget for a fresh one.
+      if (captchaEnabled) {
+        setTurnstileToken('');
+        setCaptchaKey((n) => n + 1);
       }
     } finally {
       setSubmitting(false);
@@ -192,6 +218,14 @@ export default function RegisterScreen() {
                 onSubmitEditing={() => void onSubmit()}
                 editable={!submitting}
               />
+
+              {captchaEnabled ? (
+                <View>
+                  <Text variant="label" tone="secondary">Verification</Text>
+                  <View style={{ height: theme.spacing[1] }} />
+                  <TurnstileWidget key={captchaKey} onToken={handleToken} />
+                </View>
+              ) : null}
 
               {error ? (
                 <View
