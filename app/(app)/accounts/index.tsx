@@ -136,9 +136,16 @@ function AccountRow({
               ) : null}
             </View>
             <View style={{ height: 2 }} />
+            {/* Primary = Balance (settled, negative-balance-protected), like the
+             *  web account card. Equity (incl. floating P/L) shown as a secondary
+             *  stat so a losing open position doesn't read as a "minus balance". */}
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
-              <Money value={account.equity} isCent={isCentAccount(account)} variant="numLg" />
+              <Money value={account.balance} isCent={isCentAccount(account)} variant="numLg" />
               <Text variant="body" tone="tertiary">{isCentAccount(account) ? 'Cent' : account.currency} · 1:{account.leverage}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 2 }}>
+              <Text variant="labelXs" tone="tertiary">Equity</Text>
+              <Money value={account.equity} isCent={isCentAccount(account)} variant="labelXs" tone="secondary" />
             </View>
           </View>
 

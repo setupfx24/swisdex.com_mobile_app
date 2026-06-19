@@ -91,7 +91,7 @@ export default function AccountDetailScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[8] }} keyboardShouldPersistTaps="handled">
           <View style={{ paddingHorizontal: theme.spacing[4], paddingVertical: theme.spacing[3], gap: theme.spacing[2] }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[2] }}>
-              <Money value={account.equity} isCent={cent} variant="numXxl" />
+              <Money value={account.balance} isCent={cent} variant="numXxl" />
               <Text variant="bodyMd" tone="tertiary">{cent ? 'Cent' : account.currency}</Text>
             </View>
             <Text variant="body" tone="tertiary">
@@ -101,6 +101,7 @@ export default function AccountDetailScreen() {
           <Divider />
 
           <SummaryRow label="Balance" value={summary?.balance ?? account.balance} digits={2} money isCent={cent} />
+          <SummaryRow label="Equity" value={account.equity} digits={2} money isCent={cent} />
           <SummaryRow label="Credit" value={summary?.credit ?? account.credit} digits={2} money isCent={cent} />
           <SummaryRow label="Margin used" value={summary?.margin_used ?? account.margin_used} digits={2} money isCent={cent} />
           <SummaryRow label="Free margin" value={summary?.free_margin ?? account.free_margin} digits={2} money isCent={cent} />
