@@ -229,8 +229,8 @@ export default function RiskCalculatorScreen() {
             </>
           ) : null}
 
-          {/* Direction — margin + P&L */}
-          {(tab === 'margin' || tab === 'pnl') ? (
+          {/* Direction — all tabs */}
+          {(tab === 'margin' || tab === 'pnl' || tab === 'lotsize' || tab === 'swap') ? (
             <View style={{ flexDirection: 'row', gap: theme.spacing[2] }}>
               {(['buy', 'sell'] as const).map((s) => (
                 <Pressable key={s} haptic="light" onPress={() => setSide(s)}

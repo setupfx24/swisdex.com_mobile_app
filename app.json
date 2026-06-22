@@ -5,7 +5,7 @@
     "scheme": "swisdex",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/swislogo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -14,16 +14,10 @@
     },
     "android": {
       "package": "com.swisdex.trader",
-      "adaptiveIcon": {
-        "backgroundColor": "#08090b",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/swislogo.png"
     },
     "plugins": [
       "expo-router",
@@ -32,7 +26,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#08090b",
-          "image": "./assets/icon.png",
+          "image": "./assets/swislogo.png",
           "imageWidth": 200
         }
       ],

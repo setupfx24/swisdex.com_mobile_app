@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { View, ScrollView, RefreshControl, Image, Linking, Share, useWindowDimensions } from 'react-native';
+import { View, ScrollView, RefreshControl, Image, Share, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -18,9 +18,7 @@ import { useNotificationsStore } from '@/stores/notificationsStore';
 import { priceSocket } from '@/lib/ws/priceSocket';
 import { startWebSocketLifecycle } from '@/lib/ws/appStateLifecycle';
 import { instrumentsApi } from '@/lib/api/instruments';
-import { bannersApi } from '@/lib/api/banners';
 import { businessApi, type BusinessSnapshot } from '@/lib/api/earn';
-import type { Banner } from '@/types/notifications';
 import { ProfileCompleteGate } from '@/features/auth/ProfileCompleteGate';
 import { MarketRow } from '@/features/markets/components/MarketRow';
 import { QuickActionGrid } from '@/shared/components/QuickActionGrid';
@@ -29,6 +27,13 @@ import { QuickActionGrid } from '@/shared/components/QuickActionGrid';
 // (copied from the web trader's /images/swisdex_png*.png, ~4.5:1 ratio).
 const LOGO_DARK = require('../../../assets/logo-dark.png');
 const LOGO_LIGHT = require('../../../assets/logo-light.png');
+
+// Dashboard promo banner (bundled, landscape 2.5:1). Shown below quick actions.
+const BANNERS = [
+  require('../../../assets/banners/swisbanner.png'),
+];
+// Banner: full screen width, fixed slim height (cover crops top/bottom).
+const BANNER_HEIGHT = 140;
 
 /** Vantage-style Home / Markets dashboard.
  *  Total Value hero → quick actions → promo hero → providers → watchlist. */
@@ -47,7 +52,6 @@ export default function MarketsTab() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
-  const [banners, setBanners] = useState<Banner[]>([]);
   const [referral, setReferral] = useState<BusinessSnapshot | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -65,21 +69,8 @@ export default function MarketsTab() {
     instrumentsApi.list().then(setInstruments).catch(() => {});
   }, [instruments.length, setInstruments]);
 
-  // Dashboard data: banners (page=dashboard) + the personal referral
-  // snapshot for the invite card.
+  // Dashboard data: the personal referral snapshot for the invite card.
   const loadDashboard = async () => {
-    try {
-      const res = await bannersApi.list('dashboard');
-      const list = Array.isArray(res)
-        ? res
-        : Array.isArray(res?.items)
-          ? res.items
-          : Array.isArray(res?.banners)
-            ? res.banners
-            : [];
-      setBanners(list);
-    } catch { setBanners([]); }
-
     try {
       setReferral(await businessApi.snapshot());
     } catch { setReferral(null); }
@@ -113,7 +104,10 @@ export default function MarketsTab() {
     [instruments],
   );
 
-  const totalEquity = active?.equity ?? user?.main_wallet_balance ?? 0;
+  // Negative Balance Protection: a trader can never owe, so the account value
+  // floors at 0 — never show a negative Total Value (mirrors the web fix for
+  // PAMM/MAM accounts whose floating equity can dip below zero).
+  const totalEquity = Math.max(0, active?.equity ?? user?.main_wallet_balance ?? 0);
   const todayPnL = 0; // Backend doesn't expose this directly yet — placeholder slot.
 
   return (
@@ -238,8 +232,8 @@ export default function MarketsTab() {
           />
         </View>
 
-        {/* Admin-configurable banner carousel (page=dashboard). Hidden if none. */}
-        <BannerCarousel banners={banners} />
+        {/* Promo banner carousel (bundled banner3 / banner4). */}
+        <BannerCarousel />
 
         {/* Invite friends — personal referral code (copy / share). */}
         {referral?.referral_code ? (
@@ -390,33 +384,29 @@ export default function MarketsTab() {
   );
 }
 
-/** Image banner carousel matching the web dashboard (5:1 aspect, auto-advance,
- *  paging dots). Renders nothing when there are no banners. */
-function BannerCarousel({ banners }: { banners: Banner[] }) {
+/** Bundled promo banner carousel (5:1 aspect, auto-advance, paging dots). */
+function BannerCarousel() {
   const theme = useTheme();
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
-  const pageWidth = width - theme.spacing[4] * 2;
-  const visible = banners.filter((b) => !!b.image_url);
+  const pageWidth = width; // full screen width, edge-to-edge
 
   useEffect(() => {
-    if (visible.length <= 1) return;
+    if (BANNERS.length <= 1) return;
     const t = setInterval(() => {
       setIndex((i) => {
-        const next = (i + 1) % visible.length;
+        const next = (i + 1) % BANNERS.length;
         scrollRef.current?.scrollTo({ x: next * pageWidth, animated: true });
         return next;
       });
     }, 4_000);
     return () => clearInterval(t);
-  }, [visible.length, pageWidth]);
-
-  if (visible.length === 0) return null;
+  }, [pageWidth]);
 
   return (
-    <View style={{ paddingHorizontal: theme.spacing[4], paddingBottom: theme.spacing[5] }}>
+    <View style={{ paddingBottom: theme.spacing[5] }}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -424,26 +414,24 @@ function BannerCarousel({ banners }: { banners: Banner[] }) {
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => setIndex(Math.round(e.nativeEvent.contentOffset.x / pageWidth))}
       >
-        {visible.map((b) => (
-          <Pressable
-            key={b.id}
-            haptic="light"
-            onPress={() => { if (b.link_url) void Linking.openURL(b.link_url); }}
-            style={{ width: pageWidth, borderRadius: theme.radius.lg, overflow: 'hidden' }}
+        {BANNERS.map((src, i) => (
+          <View
+            key={i}
+            style={{ width: pageWidth, overflow: 'hidden' }}
           >
             <Image
-              source={{ uri: b.image_url ?? undefined }}
-              style={{ width: pageWidth, aspectRatio: 5, backgroundColor: theme.colors.bg.secondary }}
+              source={src}
+              style={{ width: pageWidth, height: BANNER_HEIGHT, backgroundColor: theme.colors.bg.secondary }}
               resizeMode="cover"
             />
-          </Pressable>
+          </View>
         ))}
       </ScrollView>
-      {visible.length > 1 ? (
+      {BANNERS.length > 1 ? (
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: theme.spacing[2] }}>
-          {visible.map((b, i) => (
+          {BANNERS.map((_, i) => (
             <View
-              key={b.id}
+              key={i}
               style={{
                 width: 6, height: 6, borderRadius: 3,
                 backgroundColor: i === index ? theme.colors.buy : theme.colors.border.primary,
