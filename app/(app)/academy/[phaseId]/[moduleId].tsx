@@ -244,7 +244,7 @@ export default function LessonScreen() {
 
   if (!lesson || lesson.topics.length === 0) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
         <Stack.Screen options={{ title }} />
         <ProfileHeader title={title} />
         <View style={{ padding: theme.spacing[4] }}>
@@ -257,7 +257,7 @@ export default function LessonScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title }} />
       <ProfileHeader title={`Module ${moduleId}`} />
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[12] }}>

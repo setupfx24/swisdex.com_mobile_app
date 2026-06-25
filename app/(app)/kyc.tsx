@@ -74,7 +74,7 @@ export default function KycScreen() {
   const locked = status === 'submitted' || status === 'under_review' || status === 'approved';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title: 'KYC' }} />
       <ProfileHeader title="KYC verification" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

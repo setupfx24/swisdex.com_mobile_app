@@ -9,22 +9,34 @@ import { useTheme } from '@/theme';
 import { ProfileHeader } from './profile';
 
 /**
- * Official legal PDFs hosted under https://swisdex.com/pdfs/terms/<file>.
+ * Official legal documents. Where the web renders a full HTML page (e.g.
+ * swisdex.com/terms), we open that route so the mobile experience matches the
+ * web exactly; the rest open their hosted PDF under /pdfs/terms/<file>.
  * Filenames preserve the on-disk spelling (spaces + the "privcy"/"complient"
  * typos) — only the visible labels are spelled correctly.
  */
-const PDF_DOCS: { title: string; description: string; file: string; sizeKB: number }[] = [
+const SITE_BASE = 'https://swisdex.com';
+
+interface LegalDoc {
+  title: string;
+  description: string;
+  /** Web route (rendered HTML page) — preferred, matches the web. */
+  route?: string;
+  /** PDF filename under /pdfs/terms/ — used when there's no HTML route. */
+  file?: string;
+  sizeKB?: number;
+}
+
+const PDF_DOCS: LegalDoc[] = [
   {
     title: 'Terms & Conditions',
     description: 'The core agreement between you and SwisDex — eligibility, account rules, and conduct.',
-    file: 'terms and condition.pdf',
-    sizeKB: 24,
+    route: 'terms',
   },
   {
     title: 'Privacy Policy',
     description: 'What personal data we collect, how it is processed, your rights under GDPR / UK-DPA.',
-    file: 'privcy policy.pdf',
-    sizeKB: 29,
+    route: 'privacy',
   },
   {
     title: 'Promotional & Service Terms',
@@ -35,8 +47,7 @@ const PDF_DOCS: { title: string; description: string; file: string; sizeKB: numb
   {
     title: 'Deposit & Withdrawal Policy',
     description: 'Accepted rails, processing windows, fees, and the verification steps for fund movement.',
-    file: 'deposit and withdrawal.pdf',
-    sizeKB: 26,
+    route: 'deposit-withdrawal',
   },
   {
     title: 'Client Fund Security',
@@ -52,7 +63,9 @@ const PDF_DOCS: { title: string; description: string; file: string; sizeKB: numb
   },
 ];
 
-const pdfUrl = (file: string) => `https://swisdex.com/pdfs/terms/${encodeURI(file)}`;
+const pdfUrl = (file: string) => `${SITE_BASE}/pdfs/terms/${encodeURI(file)}`;
+const docUrl = (doc: LegalDoc) => (doc.route ? `${SITE_BASE}/${doc.route}` : doc.file ? pdfUrl(doc.file) : SITE_BASE);
+const docMeta = (doc: LegalDoc) => (doc.route ? 'Web page' : `PDF · ${doc.sizeKB ?? ''} KB`);
 
 /** 14 numbered sections — wording preserved verbatim from the client PDF. */
 const SECTIONS: { h: string; clauses: { n: string; body: string }[] }[] = [
@@ -168,8 +181,8 @@ const SECTIONS: { h: string; clauses: { n: string; body: string }[] }[] = [
 const RISK_DISCLAIMER =
   'Trading foreign exchange (forex) and other leveraged financial products carries a high level of risk and may not be suitable for all investors. Leverage can work both for and against you — while it amplifies potential profits, it equally amplifies potential losses. You could sustain a loss of some or all of your initial investment and should not invest money that you cannot afford to lose. You should be aware of all the risks associated with leveraged trading and seek independent financial advice if you have any doubts. Past performance is not indicative of future results.';
 
-async function openPdf(file: string) {
-  const url = pdfUrl(file);
+async function openDoc(doc: LegalDoc) {
+  const url = docUrl(doc);
   try {
     await WebBrowser.openBrowserAsync(url);
   } catch {
@@ -207,9 +220,9 @@ export default function TermsScreen() {
           <Text variant="label" tone="tertiary">OFFICIAL DOCUMENTS</Text>
         </View>
         {PDF_DOCS.map((doc) => (
-          <View key={doc.file}>
+          <View key={doc.title}>
             <Pressable
-              onPress={() => void openPdf(doc.file)}
+              onPress={() => void openDoc(doc)}
               haptic="light"
               style={({ pressed }) => ({
                 paddingHorizontal: theme.spacing[4],
@@ -221,7 +234,7 @@ export default function TermsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text variant="bodyMd" weight="medium">{doc.title}</Text>
                   <Text variant="body" tone="tertiary">{doc.description}</Text>
-                  <Text variant="labelXs" tone="tertiary">PDF · {doc.sizeKB} KB</Text>
+                  <Text variant="labelXs" tone="tertiary">{docMeta(doc)}</Text>
                 </View>
                 <Text variant="labelXs" tone="accent" weight="bold">OPEN</Text>
               </View>

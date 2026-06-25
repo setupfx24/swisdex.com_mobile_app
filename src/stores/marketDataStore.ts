@@ -12,6 +12,10 @@ const DEFAULT_WATCHLIST = [
 interface State {
   prices: Record<string, TickData>;
   prevBids: Record<string, number>;
+  /** First bid seen this session per symbol — the reference for the % change
+   *  shown in the watchlist (the backend sends no daily open / prev-close, so
+   *  "change since the app started streaming" is the best available signal). */
+  sessionOpen: Record<string, number>;
   watchlist: string[];
   instruments: InstrumentInfo[];
   selectedSymbol: string;
@@ -51,6 +55,7 @@ function scheduleFlush() {
 export const useMarketDataStore = create<State>((set, get) => ({
   prices: {},
   prevBids: {},
+  sessionOpen: {},
   watchlist: DEFAULT_WATCHLIST,
   instruments: [],
   selectedSymbol: 'XAUUSD',
@@ -113,13 +118,21 @@ flushApply = () => {
   useMarketDataStore.setState((s) => {
     const prices = { ...s.prices };
     const prevBids = { ...s.prevBids };
+    let sessionOpen = s.sessionOpen;
+    let sessionOpenChanged = false;
     for (const sym of symbols) {
       const t = buffered[sym];
       if (!t) continue;
       const prev = prices[sym];
       if (prev) prevBids[sym] = prev.bid;
       prices[sym] = t;
+      // Record the first valid bid we ever see for this symbol as the session
+      // reference — never overwritten, so the % drifts as the price moves.
+      if (s.sessionOpen[sym] == null && Number.isFinite(t.bid) && t.bid > 0) {
+        if (!sessionOpenChanged) { sessionOpen = { ...s.sessionOpen }; sessionOpenChanged = true; }
+        sessionOpen[sym] = t.bid;
+      }
     }
-    return { prices, prevBids };
+    return sessionOpenChanged ? { prices, prevBids, sessionOpen } : { prices, prevBids };
   });
 };

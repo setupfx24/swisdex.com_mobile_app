@@ -34,8 +34,8 @@ export function DualPriceButton({ bid, ask, digits, spreadPips, disabled, select
           disabled={disabled}
           style={({ pressed }) => ({
             flex: 1,
-            // SELL = red.
-            backgroundColor: disabled ? theme.colors.bg.tertiary : pressed ? '#cc1f44' : '#FF2D55',
+            // SELL = TradingView red.
+            backgroundColor: disabled ? theme.colors.bg.tertiary : pressed ? '#D92D23' : '#FF3B30',
             borderTopLeftRadius: 10,
             borderBottomLeftRadius: 10,
             borderWidth: selected === 'sell' ? 2.5 : 0,
@@ -56,8 +56,8 @@ export function DualPriceButton({ bid, ask, digits, spreadPips, disabled, select
           disabled={disabled}
           style={({ pressed }) => ({
             flex: 1,
-            // BUY = green.
-            backgroundColor: disabled ? theme.colors.bg.tertiary : pressed ? theme.colors.buyDark : theme.colors.buy,
+            // BUY = TradingView green.
+            backgroundColor: disabled ? theme.colors.bg.tertiary : pressed ? '#28A847' : '#34C759',
             borderTopRightRadius: 10,
             borderBottomRightRadius: 10,
             borderWidth: selected === 'buy' ? 2.5 : 0,

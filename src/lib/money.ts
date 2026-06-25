@@ -8,13 +8,18 @@ export const CENT_PER_USD = 100;
 
 interface CentAware {
   is_cent_account?: boolean | null;
-  account_group?: { is_cent_account?: boolean | null } | null;
+  account_group?: { is_cent_account?: boolean | null; name?: string | null } | null;
 }
 
-/** True when the account (or its group) is a cent account. */
+/** True when the account (or its group) is a cent account. Detects via the
+ *  backend `is_cent_account` flag, OR falls back to the group name containing
+ *  "cent" — some cent groups are named "CENT" in the DB without the flag set,
+ *  so name-matching keeps the ¢ display working regardless of backend state. */
 export function isCentAccount(acc?: CentAware | null): boolean {
   if (!acc) return false;
-  return Boolean(acc.is_cent_account || acc.account_group?.is_cent_account);
+  if (acc.is_cent_account || acc.account_group?.is_cent_account) return true;
+  const name = acc.account_group?.name;
+  return typeof name === 'string' && /cent/i.test(name);
 }
 
 interface FmtOpts {

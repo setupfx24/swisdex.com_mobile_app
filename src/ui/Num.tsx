@@ -67,11 +67,12 @@ export function Num({
     <Text
       variant={variant}
       tone={resolvedTone}
+      skipTranslate
       style={[explicitStyle, pnlColor ? { color: pnlColor } : null, style]}
       {...rest}
     >
       {text}
-      {suffix ? <Text variant={variant} tone="tertiary" style={{ fontWeight: theme.weights.regular }}> {suffix}</Text> : null}
+      {suffix ? <Text variant={variant} tone="tertiary" skipTranslate style={{ fontWeight: theme.weights.regular }}> {suffix}</Text> : null}
     </Text>
   );
 }

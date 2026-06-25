@@ -2,21 +2,25 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { Search, MessageCircle } from 'lucide-react-native';
-import { Text, Money, Pressable, Divider, GradientBackground } from '@/ui';
+import { Text, Money, Pressable, Divider, Field, GradientBackground } from '@/ui';
 import { useTheme } from '@/theme';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMarketDataStore } from '@/stores/marketDataStore';
 import { usePositionsStore, bindPositionsToTicks } from '@/stores/positionsStore';
 import { positionsApi } from '@/lib/api/positions';
-import { portfolioApi, type PortfolioSummary, type PortfolioPerformance, type PerfPeriod } from '@/lib/api/portfolio';
+import { portfolioApi, type PortfolioSummary, type PortfolioPerformance, type PerfPeriod, type TradeRow } from '@/lib/api/portfolio';
 import { buildDashboardFromPortfolio } from '@/features/portfolio/buildDashboard';
+import { buildStatementHtml } from '@/features/portfolio/buildStatementHtml';
 import { TradingJournal } from '@/features/portfolio/TradingJournal';
 import { fmtLots } from '@/lib/format';
+import { safeFormat } from '@/lib/date';
 import { isCentAccount, fmtAccountMoney } from '@/lib/money';
 import type { Position } from '@/types/trading';
 
-type Tab = 'open' | 'pending' | 'closed';
+type Tab = 'open' | 'closed';
 
 const TIMEFRAMES: { label: string; period: PerfPeriod }[] = [
   { label: '1M', period: '1m' },
@@ -24,7 +28,11 @@ const TIMEFRAMES: { label: string; period: PerfPeriod }[] = [
   { label: '6M', period: '6m' },
   { label: '1Y', period: '1y' },
   { label: 'All', period: 'all' },
+  { label: 'Custom', period: 'custom' },
 ];
+
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 /** Portfolio → Trading Journal (mirrors the web /portfolio module):
  *  timeframe selector, balance/equity, P&L stats, streak rings, trading
@@ -33,18 +41,22 @@ export default function PortfolioTab() {
   const theme = useTheme();
   const active = useAccountsStore((s) => s.active);
   const positions = usePositionsStore((s) => s.positions);
-  const pendingOrders = usePositionsStore((s) => s.pendingOrders);
   const loadPositions = usePositionsStore((s) => s.load);
   const instruments = useMarketDataStore((s) => s.instruments);
 
   const [tab, setTab] = useState<Tab>('open');
   const [period, setPeriod] = useState<PerfPeriod>('1m');
+  const [customFrom, setCustomFrom] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return ymd(d); });
+  const [customTo, setCustomTo] = useState(() => ymd(new Date()));
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [performance, setPerformance] = useState<PortfolioPerformance | null>(null);
-  const [trades, setTrades] = useState<{ pnl: number; lots?: number; close_time?: string; opened_at?: string }[]>([]);
+  const [tradeRows, setTradeRows] = useState<TradeRow[]>([]);
+
+  const isCent = isCentAccount(active);
 
   useEffect(() => {
     if (!active) return;
@@ -56,23 +68,25 @@ export default function PortfolioTab() {
   const fetchJournal = useCallback(async () => {
     if (!active) return;
     setLoading(true);
+    // Custom range → scope performance + trades to the picked window (web parity).
+    const dateParams = period === 'custom'
+      ? { date_from: `${customFrom}T00:00:00`, date_to: `${customTo}T23:59:59` }
+      : {};
     try {
       const [sum, perf, tr] = await Promise.all([
         portfolioApi.summary(active.id),
-        portfolioApi.performance({ period, account_id: active.id }),
-        portfolioApi.trades({ account_id: active.id, page: 1, per_page: 200 }),
+        portfolioApi.performance({ period, account_id: active.id, ...dateParams }),
+        portfolioApi.trades({ account_id: active.id, page: 1, per_page: 200, ...dateParams }),
       ]);
       setSummary(sum);
       setPerformance(perf);
-      setTrades((tr.items ?? []).map((t) => ({
-        pnl: Number(t.pnl) || 0, lots: t.lots, close_time: t.close_time, opened_at: t.opened_at,
-      })));
+      setTradeRows(tr.items ?? []);
     } catch {
       // Leave previous data on screen; journal falls back to zeros below.
     } finally {
       setLoading(false);
     }
-  }, [active, period]);
+  }, [active, period, customFrom, customTo]);
 
   useEffect(() => { void fetchJournal(); }, [fetchJournal]);
 
@@ -83,7 +97,9 @@ export default function PortfolioTab() {
     const freeMargin = active?.free_margin ?? Math.max(0, equity - usedMargin);
     const marginLevel = active?.margin_level && active.margin_level > 0 ? `${active.margin_level.toFixed(1)}%` : null;
     const periodPnl =
-      period === 'all' ? summary.pnl_breakdown?.all_time ?? 0 : summary.pnl_breakdown?.this_month ?? 0;
+      period === 'custom' ? tradeRows.reduce((a, t) => a + (Number(t.pnl) || 0), 0) :
+      period === 'all' ? summary.pnl_breakdown?.all_time ?? 0 :
+      summary.pnl_breakdown?.this_month ?? 0;
     const openLots = (summary.holdings ?? []).reduce((a, h) => a + (Number(h.total_lots ?? h.lots) || 0), 0);
     return buildDashboardFromPortfolio({
       balance: Number(summary.total_balance) || 0,
@@ -94,14 +110,40 @@ export default function PortfolioTab() {
       periodPnl,
       winRateFallback: performance?.stats?.win_rate ?? 0,
       sharpeRatio: performance?.stats?.sharpe_ratio ?? 0,
-      trades,
+      trades: tradeRows,
       equityCurve: performance?.equity_curve ?? [],
       freeMargin,
       usedMargin,
       marginLevel,
       currency: active?.currency ?? 'USD',
     });
-  }, [summary, performance, trades, period, active]);
+  }, [summary, performance, tradeRows, period, active]);
+
+  const periodLabel = period === 'custom' ? `${customFrom} → ${customTo}`
+    : (TIMEFRAMES.find((t) => t.period === period)?.label ?? period);
+
+  // Download a PDF statement of the trades currently in view (web parity).
+  const downloadPdf = useCallback(async () => {
+    if (pdfBusy || tradeRows.length === 0) return;
+    setPdfBusy(true);
+    try {
+      const html = buildStatementHtml({
+        accountLabel: active?.account_number ? `#${active.account_number}` : 'Account',
+        periodLabel,
+        generatedAt: safeFormat(new Date().toISOString(), 'MMM d, yyyy HH:mm'),
+        trades: tradeRows,
+        isCent,
+      });
+      const { uri } = await Print.printToFileAsync({ html });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'SwisDex trade statement', UTI: 'com.adobe.pdf' });
+      }
+    } catch (e: unknown) {
+      Alert.alert('Export failed', e instanceof Error ? e.message : 'Could not create the PDF.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }, [pdfBusy, tradeRows, active, periodLabel, isCent]);
 
   return (
     <GradientBackground>
@@ -134,7 +176,7 @@ export default function PortfolioTab() {
           }
         >
           {/* Timeframe selector */}
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4, marginBottom: theme.spacing[4] }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 4, marginBottom: theme.spacing[2] }}>
             {TIMEFRAMES.map((t) => {
               const sel = period === t.period;
               return (
@@ -146,9 +188,23 @@ export default function PortfolioTab() {
             })}
           </View>
 
+          {/* Custom date range (web parity) — visible only for the Custom preset. */}
+          {period === 'custom' ? (
+            <View style={{ flexDirection: 'row', gap: theme.spacing[3], marginBottom: theme.spacing[4] }}>
+              <View style={{ flex: 1 }}>
+                <Field label="From (YYYY-MM-DD)" value={customFrom} onChangeText={setCustomFrom} placeholder="2026-05-01" autoCapitalize="none" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="To (YYYY-MM-DD)" value={customTo} onChangeText={setCustomTo} placeholder="2026-06-01" autoCapitalize="none" />
+              </View>
+            </View>
+          ) : (
+            <View style={{ height: theme.spacing[2] }} />
+          )}
+
           {/* Trading Journal */}
           {dashboard ? (
-            <TradingJournal data={dashboard} isCent={isCentAccount(active)} />
+            <TradingJournal data={dashboard} isCent={isCent} />
           ) : loading ? (
             <View style={{ paddingVertical: theme.spacing[10], alignItems: 'center' }}>
               <ActivityIndicator color={theme.colors.buy} />
@@ -183,16 +239,33 @@ export default function PortfolioTab() {
             ) : (
               positions.map((p) => (
                 <View key={p.id}>
-                  <PositionRow position={p} instruments={instruments} theme={theme} isCent={isCentAccount(active)} />
+                  <PositionRow position={p} instruments={instruments} theme={theme} isCent={isCent} />
                   <Divider inset={theme.spacing[4]} />
                 </View>
               ))
             )
           ) : (
-            <Pressable haptic="light" onPress={() => router.push('/portfolio-history')}
-              style={{ marginTop: theme.spacing[3], padding: theme.spacing[4], borderRadius: theme.radius.md, backgroundColor: theme.colors.bg.secondary, alignItems: 'center' }}>
-              <Text variant="bodyMd" tone="accent" weight="semibold">Open full trade history →</Text>
-            </Pressable>
+            <View>
+              {/* Download PDF statement (web parity) */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: theme.spacing[2] }}>
+                <Text variant="labelXs" tone="tertiary">{tradeRows.length} closed · {periodLabel}</Text>
+                <Pressable haptic="light" onPress={downloadPdf} disabled={pdfBusy || tradeRows.length === 0}
+                  style={{ paddingHorizontal: theme.spacing[3], paddingVertical: theme.spacing[2], borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border.accent, backgroundColor: theme.colors.buyBg, opacity: pdfBusy || tradeRows.length === 0 ? 0.5 : 1 }}>
+                  <Text variant="labelXs" weight="bold" tone="accent">{pdfBusy ? 'Generating…' : 'Download PDF'}</Text>
+                </Pressable>
+              </View>
+              <Divider />
+              {tradeRows.length === 0 ? (
+                <EmptyPositions theme={theme} text="No closed trades in this period" />
+              ) : (
+                tradeRows.map((t) => (
+                  <View key={t.id}>
+                    <ClosedTradeRow trade={t} instruments={instruments} theme={theme} isCent={isCent} />
+                    <Divider inset={theme.spacing[4]} />
+                  </View>
+                ))
+              )}
+            </View>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -204,6 +277,36 @@ function EmptyPositions({ theme, text = 'No open positions' }: { theme: ReturnTy
   return (
     <View style={{ marginTop: theme.spacing[6], padding: theme.spacing[8], borderRadius: theme.radius.lg, borderWidth: 1, borderStyle: 'dashed', borderColor: theme.colors.border.primary, alignItems: 'center' }}>
       <Text variant="bodyMd" tone="tertiary">{text}</Text>
+    </View>
+  );
+}
+
+/** A closed trade row in the Trade-history tab (web parity). */
+function ClosedTradeRow({ trade, instruments, theme, isCent }: {
+  trade: TradeRow;
+  instruments: { symbol: string; digits: number }[];
+  theme: ReturnType<typeof useTheme>;
+  isCent: boolean;
+}) {
+  const digits = instruments.find((i) => i.symbol === trade.symbol)?.digits ?? 5;
+  const isBuy = trade.side === 'buy';
+  return (
+    <View style={{ paddingHorizontal: theme.spacing[4], paddingVertical: theme.spacing[3] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}>
+          <Text variant="bodyMd" weight="bold" tone={isBuy ? 'buy' : 'sell'}>{trade.side.toUpperCase()}</Text>
+          <Text variant="bodyMd" weight="medium">{trade.symbol}</Text>
+          <Text variant="labelXs" tone="tertiary">{fmtLots(trade.lots)}</Text>
+        </View>
+        <Money value={trade.pnl} isCent={isCent} pnl signed variant="num" />
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing[3], marginTop: 2 }}>
+        <Text variant="labelXs" tone="tertiary">
+          {trade.open_price.toFixed(digits)} → {trade.close_price.toFixed(digits)}
+        </Text>
+        <Text variant="labelXs" tone="tertiary">{safeFormat(trade.close_time, 'MMM d HH:mm')}</Text>
+        {trade.close_reason ? <Text variant="labelXs" tone="tertiary">{trade.close_reason.toUpperCase()}</Text> : null}
+      </View>
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
@@ -7,6 +7,7 @@ import { Text, Field, Divider, Pressable, Skeleton } from '@/ui';
 import { useTheme } from '@/theme';
 import { useMarketDataStore } from '@/stores/marketDataStore';
 import { instrumentsApi } from '@/lib/api/instruments';
+import { loadCachedInstruments } from '@/lib/cache/instrumentsCache';
 import { ProfileHeader } from './profile';
 import type { InstrumentInfo } from '@/types/market';
 
@@ -24,14 +25,28 @@ export default function InstrumentsScreen() {
   const [query, setQuery] = useState('');
   const [segment, setSegment] = useState<Segment>('all');
   const [loading, setLoading] = useState(instruments.length === 0);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    // Seed from cache instantly so the list isn't blank while fetching.
+    const cached = loadCachedInstruments();
+    if (cached && instruments.length === 0) setInstruments(cached);
+    setLoading(instruments.length === 0 && !cached);
+    try {
+      const list = await instrumentsApi.listWithRetry();
+      setInstruments(Array.isArray(list) ? list : []);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Could not load instruments.');
+    } finally {
+      setLoading(false);
+    }
+  }, [setInstruments, instruments.length]);
 
   useEffect(() => {
-    if (instruments.length > 0) return;
-    instrumentsApi.list().then((list) => {
-      setInstruments(list);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [instruments.length, setInstruments]);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toUpperCase();
@@ -86,6 +101,24 @@ export default function InstrumentsScreen() {
           {Array.from({ length: 10 }).map((_, i) => (
             <Skeleton key={i} width="100%" height={28} />
           ))}
+        </View>
+      ) : error ? (
+        <View style={{ padding: theme.spacing[6], gap: theme.spacing[3], alignItems: 'center' }}>
+          <Text variant="bodyMd" tone="sell" align="center">{error}</Text>
+          <Pressable
+            haptic="light"
+            onPress={() => { void load(); }}
+            style={({ pressed }) => ({
+              paddingHorizontal: theme.spacing[4],
+              paddingVertical: theme.spacing[2],
+              borderRadius: theme.radius.md,
+              borderWidth: 1,
+              borderColor: theme.colors.border.primary,
+              backgroundColor: pressed ? theme.colors.bg.hover : theme.colors.bg.secondary,
+            })}
+          >
+            <Text variant="bodyMd" tone="accent" weight="semibold">Retry</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList

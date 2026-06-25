@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
-import { ArrowDown } from 'lucide-react-native';
+import { ArrowDown, AlertTriangle, Check } from 'lucide-react-native';
 import { Text, Num, Field, Button, Pressable, Divider } from '@/ui';
 import { useTheme } from '@/theme';
 import { walletApi, type WalletLiveAccount } from '@/lib/api/wallet';
+import { isCentAccount } from '@/lib/money';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { ProfileHeader } from '../profile';
+import { useKycApproved, KycNotice } from '@/features/wallet/KycGate';
 
 // Mirror the web trader's unified transfer (frontend/trader/src/app/accounts/page.tsx
 // `submitUnifiedTransfer`). A single source/destination selector over
@@ -35,14 +37,23 @@ interface TransferOption {
   id: string;
   label: string;
   sublabel: string;
+  /** Transferable amount (free margin for trading accounts). */
   balance: number;
   currency: string;
+  /** Settled account balance — used for the credit-forfeiture check. */
+  accountBalance: number;
+  /** Bonus/admin credit on this account (0 for the main wallet). */
+  credit: number;
 }
 
 export default function TransferScreen() {
   const theme = useTheme();
+  const kycApproved = useKycApproved();
   const isDemo = useAuthStore((s) => s.user?.is_demo ?? false);
   const reloadAccounts = useAccountsStore((s) => s.load);
+  // Full accounts (with account_group) — the wallet summary doesn't carry type
+  // info, so we cross-reference by id to label each card Standard / Cent.
+  const accounts = useAccountsStore((s) => s.accounts);
 
   const [loading, setLoading] = useState(true);
   const [mainBalance, setMainBalance] = useState(0);
@@ -55,6 +66,9 @@ export default function TransferScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  // Acknowledgement that the user accepts forfeiting their bonus credit when a
+  // trading→wallet transfer would drop the account balance below its credit.
+  const [ackForfeit, setAckForfeit] = useState(false);
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -102,28 +116,47 @@ export default function TransferScreen() {
 
   const options = useMemo<TransferOption[]>(() => {
     const opts: TransferOption[] = [
-      { id: WALLET_ID, label: 'Main Wallet', sublabel: 'Wallet', balance: mainBalance, currency: 'USD' },
+      { id: WALLET_ID, label: 'Main Wallet', sublabel: 'Wallet', balance: mainBalance, currency: 'USD', accountBalance: mainBalance, credit: 0 },
     ];
     for (const a of liveAccounts) {
+      // Match the full account to read its group (type + cent flag).
+      const full = accounts.find((x) => x.id === a.id || x.account_number === a.account_number);
+      const cent = isCentAccount(full);
+      const typeName = cent ? 'Cent' : (full?.account_group?.name ?? 'Standard');
       opts.push({
         id: a.id,
         label: `#${a.account_number}`,
-        sublabel: 'Live',
+        sublabel: `Live · ${typeName}`,
         balance: Math.max(0, Number(a.free_margin ?? a.balance ?? 0)),
         currency: a.currency ?? 'USD',
+        accountBalance: Number(a.balance ?? 0),
+        credit: Number(a.credit ?? 0),
       });
     }
     return opts;
-  }, [liveAccounts, mainBalance]);
+  }, [liveAccounts, mainBalance, accounts]);
 
   const fromOption = options.find((o) => o.id === fromId);
   const fromBalance = fromOption?.balance ?? 0;
+
+  // Credit-protection rule (mirrors the backend + web): moving balance OUT of a
+  // trading account back to the wallet, such that its settled balance drops
+  // below its bonus credit, forfeits the ENTIRE credit. Warn + require an
+  // explicit acknowledgement before allowing it.
+  const fromCredit = fromOption?.credit ?? 0;
+  const amtNum = parseFloat(amount) || 0;
+  const willForfeit =
+    fromId !== WALLET_ID &&
+    toId === WALLET_ID &&
+    fromCredit > 0 &&
+    (fromOption?.accountBalance ?? 0) - amtNum < fromCredit;
 
   // A wallet→wallet pairing is impossible; if both ends land on wallet, push
   // the other end onto the first available account.
   const pickFrom = (id: string) => {
     setError(null);
     setSuccess(null);
+    setAckForfeit(false);
     setFromId(id);
     if (id === WALLET_ID && toId === WALLET_ID) {
       setToId(liveAccounts[0]?.id ?? '');
@@ -137,6 +170,7 @@ export default function TransferScreen() {
   const pickTo = (id: string) => {
     setError(null);
     setSuccess(null);
+    setAckForfeit(false);
     setToId(id);
     if (id === WALLET_ID && fromId === WALLET_ID) {
       setFromId(liveAccounts[0]?.id ?? '');
@@ -158,6 +192,9 @@ export default function TransferScreen() {
     if (fromId === toId) return setError('Source and destination must differ.');
     if (fromId === WALLET_ID && toId === WALLET_ID) return setError('Cannot transfer wallet to wallet.');
     if (amt > fromBalance + 1e-9) return setError('Insufficient balance in the source.');
+    if (willForfeit && !ackForfeit) {
+      return setError('Please acknowledge that your bonus credit will be forfeited.');
+    }
 
     setSubmitting(true);
     try {
@@ -170,6 +207,7 @@ export default function TransferScreen() {
       }
       setSuccess('Transfer complete.');
       setAmount('');
+      setAckForfeit(false);
       // Re-fetch live balances + sync the global accounts store so balances
       // update everywhere (mirrors the web's fetchWalletSummary + fetchAccounts).
       await Promise.all([fetchSummary(), reloadAccounts()]);
@@ -180,6 +218,17 @@ export default function TransferScreen() {
       setSubmitting(false);
     }
   };
+
+  // Identity verification gate — no fund movement until KYC is approved.
+  if (!kycApproved) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+        <Stack.Screen options={{ title: 'Transfer' }} />
+        <ProfileHeader title="Transfer" />
+        <KycNotice action="transfer funds" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
@@ -253,7 +302,7 @@ export default function TransferScreen() {
                 label="Amount (USD)"
                 hint={`Available: ${fromBalance.toFixed(2)} ${fromOption?.currency ?? 'USD'}`}
                 value={amount}
-                onChangeText={(t) => { setAmount(t); setError(null); setSuccess(null); }}
+                onChangeText={(t) => { setAmount(t); setError(null); setSuccess(null); setAckForfeit(false); }}
                 keyboardType="decimal-pad"
                 placeholder="0.00"
                 editable={!submitting}
@@ -268,6 +317,54 @@ export default function TransferScreen() {
                 <Text variant="body" tone="accent" weight="semibold">Transfer max</Text>
               </Pressable>
 
+              {/* Credit-forfeiture warning + required acknowledgement. */}
+              {willForfeit ? (
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: 'rgba(245,158,11,0.40)',
+                    backgroundColor: 'rgba(245,158,11,0.07)',
+                    borderRadius: theme.radius.md,
+                    padding: theme.spacing[3],
+                    gap: theme.spacing[3],
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', gap: theme.spacing[2] }}>
+                    <AlertTriangle size={16} color="#fbbf24" style={{ marginTop: 2 }} />
+                    <Text variant="body" style={{ flex: 1, color: '#fcd34d', lineHeight: 18 }}>
+                      <Text variant="body" weight="bold" style={{ color: '#fbbf24' }}>
+                        This account has ${fromCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} bonus credit.{' '}
+                      </Text>
+                      You must keep at least that balance in it. This transfer drops the balance below the credit, so your
+                      entire credit will be forfeited (insurance payouts are kept).
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setAckForfeit((v) => !v)}
+                    haptic="light"
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[2] }}
+                  >
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: theme.radius.sm,
+                        borderWidth: 1.5,
+                        borderColor: ackForfeit ? theme.colors.buy : 'rgba(245,158,11,0.6)',
+                        backgroundColor: ackForfeit ? theme.colors.buy : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {ackForfeit ? <Check size={15} color="#FFFFFF" strokeWidth={3} /> : null}
+                    </View>
+                    <Text variant="body" style={{ flex: 1, color: '#fcd34d' }}>
+                      I understand my ${fromCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} credit will be forfeited.
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
               {error ? <Text variant="body" tone="sell">{error}</Text> : null}
               {success ? <Text variant="body" tone="buy">{success}</Text> : null}
 
@@ -276,7 +373,7 @@ export default function TransferScreen() {
                 size="xl"
                 onPress={onSubmit}
                 loading={submitting}
-                disabled={!amount || !fromId || !toId}
+                disabled={!amount || !fromId || !toId || (willForfeit && !ackForfeit)}
               >
                 {amount ? `Transfer — $${(parseFloat(amount) || 0).toLocaleString()}` : 'Transfer'}
               </Button>

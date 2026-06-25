@@ -59,7 +59,7 @@ export function Money({
   const explicitStyle: TextStyle = { fontVariant: ['tabular-nums'] };
 
   return (
-    <Text variant={variant} tone={resolvedTone} style={[explicitStyle, pnlColor ? { color: pnlColor } : null, style]} {...rest}>
+    <Text variant={variant} tone={resolvedTone} skipTranslate style={[explicitStyle, pnlColor ? { color: pnlColor } : null, style]} {...rest}>
       {text}
     </Text>
   );

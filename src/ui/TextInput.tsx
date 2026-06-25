@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useTheme } from '@/theme';
+import { useT } from '@/lib/i18n';
 
 export interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
   invalid?: boolean;
@@ -20,10 +21,11 @@ export interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
  *  Forwarded ref so callers can imperatively focus (e.g. autofocus the
  *  TOTP input the moment the 2FA prompt opens). */
 export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextInput(
-  { invalid = false, containerStyle, rightSlot, onFocus, onBlur, ...rest },
+  { invalid = false, containerStyle, rightSlot, placeholder, onFocus, onBlur, ...rest },
   ref,
 ) {
   const theme = useTheme();
+  const tr = useT();
   const [focused, setFocused] = useState(false);
   const borderColor = invalid
     ? theme.colors.sell
@@ -47,6 +49,7 @@ export const TextInput = forwardRef<RNTextInput, TextInputProps>(function TextIn
       <RNTextInput
         ref={ref}
         {...rest}
+        placeholder={placeholder ? tr(placeholder) : placeholder}
         placeholderTextColor={theme.colors.text.tertiary}
         selectionColor={theme.colors.buy}
         onFocus={(e) => {

@@ -171,7 +171,7 @@ export default function PammScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title: 'PAMM' }} />
       <ProfileHeader title="PAMM" />
 

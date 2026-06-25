@@ -58,13 +58,18 @@ export const usePositionsStore = create<State>((set, get) => ({
     if (!tick) return;
     const { instruments } = useMarketDataStore.getState();
     const inst = instruments.find((i) => i.symbol === symbol);
-    const contractSize = inst?.contract_size ?? 100_000;
+    // contract_size arrives as a string ("100.0000") — coerce. If the spec
+    // isn't loaded yet, DON'T fall back to the 100k forex default: that makes
+    // metals/indices/crypto P&L ~1000× too large. Keep the backend's
+    // authoritative profit until the real contract size is available.
+    const cs = Number(inst?.contract_size);
+    const contractSize = Number.isFinite(cs) && cs > 0 ? cs : null;
 
     set((s) => {
       const next = s.positions.map((p) => {
         if (p.symbol !== symbol) return p;
         const cp = p.side === 'buy' ? tick.bid : tick.ask;
-        const profit = computePnL(p, cp, contractSize, inst);
+        const profit = contractSize != null ? computePnL(p, cp, contractSize, inst) : p.profit;
         return { ...p, current_price: cp, profit };
       });
       return { positions: next };

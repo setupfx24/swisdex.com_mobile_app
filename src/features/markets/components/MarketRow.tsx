@@ -30,11 +30,13 @@ const CATEGORY_COLORS: Record<string, string> = {
 export function MarketRow({ symbol, instrument, sparkline, onPress }: MarketRowProps) {
   const theme = useTheme();
   const price = useMarketDataStore((s) => s.prices[symbol]);
-  const prev = useMarketDataStore((s) => s.prevBids[symbol]);
+  // Reference = first bid seen this session (backend sends no daily open), so
+  // the % reflects how far the price has moved since streaming began.
+  const ref = useMarketDataStore((s) => s.sessionOpen[symbol]);
   const digits = instrument?.digits ?? 5;
 
-  const change = price && prev ? price.bid - prev : 0;
-  const changePct = price && prev && prev !== 0 ? (change / prev) * 100 : 0;
+  const change = price && ref ? price.bid - ref : 0;
+  const changePct = price && ref && ref !== 0 ? (change / ref) * 100 : 0;
   const isUp = change >= 0;
   const segment = instrument?.segment ?? '';
   const catColor = CATEGORY_COLORS[segment.toLowerCase()] ?? theme.colors.text.secondary;
@@ -88,7 +90,7 @@ export function MarketRow({ symbol, instrument, sparkline, onPress }: MarketRowP
 
       <View style={{ alignItems: 'flex-end', minWidth: 80 }}>
         <Num value={price?.bid} digits={digits} variant="bodyLg" />
-        <Text variant="bodyMd" weight="semibold" tone={isUp ? 'buy' : 'sell'}>
+        <Text variant="bodyMd" weight="semibold" style={{ color: !price ? theme.colors.text.tertiary : isUp ? theme.colors.buy : '#FF5C5C' }}>
           {price ? `${isUp ? '+' : ''}${changePct.toFixed(2)}%` : '—'}
         </Text>
       </View>

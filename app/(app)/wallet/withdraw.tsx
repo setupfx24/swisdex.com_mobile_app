@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import type { PlatformStatus } from '@/types/auth';
 import { ProfileHeader } from '../profile';
+import { useKycApproved, KycNotice } from '@/features/wallet/KycGate';
 
 // Mirror the web trader's withdraw flow (frontend/trader/src/app/wallet/page.tsx).
 // Two admin-gated rails: 'crypto' (OxaPay payout) and 'manual' (bank/UPI + QR).
@@ -54,6 +55,7 @@ interface QrFile {
 
 export default function WithdrawScreen() {
   const theme = useTheme();
+  const kycApproved = useKycApproved();
   const status = usePlatformStatusStore((s) => s.status) as PlatformStatusWithMins | null;
   const refreshMe = useAuthStore((s) => s.refreshMe);
 
@@ -170,22 +172,22 @@ export default function WithdrawScreen() {
     setQr({ uri: a.uri, name, mimeType: a.mimeType ?? 'image/jpeg' });
   };
 
-  // Shared amount validation: positive, >= min, <= main wallet balance.
+  // Shared amount validation: positive, >= min, <= main wallet balance (USD).
   const validateAmount = (): number | null => {
-    const amt = parseFloat(amount);
-    if (!Number.isFinite(amt) || amt <= 0) {
+    const entered = parseFloat(amount);
+    if (!Number.isFinite(entered) || entered <= 0) {
       setError('Enter a valid amount.');
       return null;
     }
-    if (minWithdraw > 0 && amt < minWithdraw) {
+    if (minWithdraw > 0 && entered < minWithdraw) {
       setError(`Minimum withdrawal is $${minWithdraw.toLocaleString()}.`);
       return null;
     }
-    if (amt > mainBalance) {
+    if (entered > mainBalance) {
       setError(`Amount exceeds your main wallet balance ($${mainBalance.toLocaleString()}).`);
       return null;
     }
-    return amt;
+    return entered;
   };
 
   // Crypto: JSON POST to /wallet/withdraw. Payload mirrors the web exactly:
@@ -279,6 +281,17 @@ export default function WithdrawScreen() {
     }
   };
 
+  // Identity verification gate — no withdrawals until KYC is approved.
+  if (!kycApproved) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+        <Stack.Screen options={{ title: 'Withdraw' }} />
+        <ProfileHeader title="Withdraw" />
+        <KycNotice action="withdraw funds" />
+      </SafeAreaView>
+    );
+  }
+
   // Withdrawals paused by the broker (allow_withdrawals === false).
   if (status && status.allow_withdrawals === false) {
     return (
@@ -300,9 +313,13 @@ export default function WithdrawScreen() {
   ];
   const visibleTabs = tabs.filter((t) => t.enabled);
 
-  // Bonus forfeiture warning: shown when the user has an unredeemed main-wallet
-  // bonus and hasn't already forfeited it (mirrors the web's wording).
-  const showBonusWarning = !summary?.bonus_forfeited_at && (Number(summary?.main_wallet_bonus) || 0) > 0;
+  // Bonus forfeiture warning: shown when the user still holds bonus credit
+  // (either as an unredeemed main-wallet bonus OR swept onto a trading account
+  // as credit) and hasn't already forfeited it. Mirrors the web condition.
+  const hasBonusCredit =
+    (Number(summary?.main_wallet_bonus) || 0) > 0 ||
+    (summary?.live_accounts ?? []).some((a) => (Number(a.credit) || 0) > 0);
+  const showBonusWarning = !summary?.bonus_forfeited_at && hasBonusCredit;
 
   const selectedAsset = CRYPTO_ASSETS.find((c) => c.id === asset) ?? CRYPTO_ASSETS[0];
 

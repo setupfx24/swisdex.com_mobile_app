@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -363,11 +363,11 @@ export default function TradeTab() {
                       flex: 1, paddingVertical: theme.spacing[2],
                       borderRadius: theme.radius.md,
                       backgroundColor: selected
-                        ? (s === 'buy' ? theme.colors.buy : '#FF2D55')
+                        ? (s === 'buy' ? '#34C759' : '#FF3B30')
                         : pressed ? theme.colors.bg.hover : theme.colors.bg.secondary,
                       borderWidth: 1,
                       borderColor: selected
-                        ? (s === 'buy' ? theme.colors.buy : '#FF2D55')
+                        ? (s === 'buy' ? '#34C759' : '#FF3B30')
                         : theme.colors.border.primary,
                       alignItems: 'center',
                     })}
@@ -402,7 +402,8 @@ export default function TradeTab() {
               />
             ) : null}
             <Button
-              variant={pendingSide === 'buy' ? 'buy' : 'sell'}
+              variant="buy"
+              color={pendingSide === 'buy' ? '#34C759' : '#FF3B30'}
               size="xl"
               onPress={submitPending}
               loading={pendingSubmitting}
@@ -465,9 +466,24 @@ export default function TradeTab() {
           >
             <Minus size={16} color={theme.colors.text.primary} strokeWidth={2.5} />
           </Pressable>
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text variant="numLg">{lots}</Text>
-          </View>
+          {/* Editable lot size — type manually or use +/-. */}
+          <TextInput
+            value={lots}
+            onChangeText={setLots}
+            keyboardType="decimal-pad"
+            placeholder="0.01"
+            placeholderTextColor={theme.colors.text.tertiary}
+            selectTextOnFocus
+            style={{
+              flex: 1,
+              textAlign: 'center',
+              color: theme.colors.text.primary,
+              fontSize: 20,
+              fontWeight: '700',
+              fontVariant: ['tabular-nums'],
+              paddingVertical: 0,
+            }}
+          />
           <Pressable
             haptic="light"
             onPress={() => bump(0.01)}
@@ -480,14 +496,7 @@ export default function TradeTab() {
           >
             <Plus size={16} color={theme.colors.text.primary} strokeWidth={2.5} />
           </Pressable>
-          <Pressable
-            haptic="light"
-            onPress={() => {}}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1] }}
-          >
-            <Text variant="bodyMd" weight="medium">Lots</Text>
-            <ChevronDown size={14} color={theme.colors.text.secondary} />
-          </Pressable>
+          <Text variant="bodyMd" weight="medium" tone="secondary">Lots</Text>
         </View>
 
         {/* Info rows */}
@@ -513,7 +522,7 @@ export default function TradeTab() {
         {orderType === 'market' ? (
           <Button
             variant="buy"
-            color={selectedSide === 'sell' ? '#FF2D55' : undefined}
+            color={selectedSide === 'sell' ? '#FF3B30' : '#34C759'}
             size="xl"
             onPress={() => submit(selectedSide)}
             loading={side === selectedSide}

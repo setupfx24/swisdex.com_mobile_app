@@ -28,7 +28,7 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
       <View
         style={{
           paddingHorizontal: theme.spacing[5],

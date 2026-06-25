@@ -102,7 +102,7 @@ export function MarketRow({ symbol, instrument, showSparkline = false, sparkline
                 signed
                 suffix="%"
                 variant="bodyB"
-                tone={change.positive ? 'buy' : 'sell'}
+                pnl
               />
             ) : null}
           </>

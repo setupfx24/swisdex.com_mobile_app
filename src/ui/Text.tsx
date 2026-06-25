@@ -1,5 +1,6 @@
 import { Text as RNText, type TextProps as RNTextProps, type TextStyle } from 'react-native';
 import { useTheme, type TextVariant } from '@/theme';
+import { useTranslated } from '@/lib/i18n';
 
 type Tone = 'primary' | 'secondary' | 'tertiary' | 'accent' | 'buy' | 'sell' | 'warning' | 'inverse';
 
@@ -8,6 +9,8 @@ export interface TextProps extends RNTextProps {
   tone?: Tone;
   align?: TextStyle['textAlign'];
   weight?: 'regular' | 'medium' | 'semibold' | 'bold';
+  /** Opt out of auto-translation (numbers, prices, symbols — see Num/Money). */
+  skipTranslate?: boolean;
 }
 
 /** Single typography entry point. Avoid using RN's Text directly anywhere —
@@ -20,9 +23,16 @@ export function Text({
   weight,
   style,
   children,
+  skipTranslate = false,
   ...rest
 }: TextProps) {
   const theme = useTheme();
+  // Auto-translate plain string content into the active language. Non-string
+  // children (numbers, nested elements/arrays) pass through untouched — each
+  // nested <Text> leaf translates itself.
+  const isString = typeof children === 'string';
+  const translated = useTranslated(isString ? children : '');
+  const content = !skipTranslate && isString ? translated : children;
   const base = theme.text[variant];
   const color =
     tone === 'buy'
@@ -46,7 +56,7 @@ export function Text({
         style,
       ]}
     >
-      {children}
+      {content}
     </RNText>
   );
 }

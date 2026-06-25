@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/theme';
+import { useT } from '@/lib/i18n';
 import { AnimatedTabIcon } from '@/features/nav/AnimatedTabIcon';
 
 // Lottie sources per tab (authored green; retinted at runtime to follow the
@@ -21,6 +22,7 @@ const ICONS = {
  *  is accent-green, inactive stays grey. */
 export default function TabsLayout() {
   const theme = useTheme();
+  const tr = useT();
   const insets = useSafeAreaInsets();
   const pillHeight = 64;
   const bottomMargin = Math.max(insets.bottom, 12);
@@ -91,11 +93,11 @@ export default function TabsLayout() {
         ),
       }}
     >
-      <Tabs.Screen name="markets" options={{ title: 'Markets', tabBarIcon: icon(ICONS.markets) }} />
-      <Tabs.Screen name="trade" options={{ title: 'Trade', tabBarIcon: icon(ICONS.trade) }} />
-      <Tabs.Screen name="portfolio" options={{ title: 'Portfolio', tabBarIcon: icon(ICONS.portfolio) }} />
-      <Tabs.Screen name="wallet" options={{ title: 'Wallet', tabBarIcon: icon(ICONS.wallet) }} />
-      <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon(ICONS.more) }} />
+      <Tabs.Screen name="markets" options={{ title: tr('Markets'), tabBarIcon: icon(ICONS.markets) }} />
+      <Tabs.Screen name="trade" options={{ title: tr('Trade'), tabBarIcon: icon(ICONS.trade) }} />
+      <Tabs.Screen name="portfolio" options={{ title: tr('Portfolio'), tabBarIcon: icon(ICONS.portfolio) }} />
+      <Tabs.Screen name="wallet" options={{ title: tr('Wallet'), tabBarIcon: icon(ICONS.wallet) }} />
+      <Tabs.Screen name="more" options={{ title: tr('More'), tabBarIcon: icon(ICONS.more) }} />
     </Tabs>
   );
 }

@@ -19,7 +19,7 @@ export default function QuizScreen() {
 
   if (!phase) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
         <Stack.Screen options={{ title: 'Quiz' }} />
         <ProfileHeader title="Quiz" />
         <View style={{ padding: theme.spacing[4] }}>
@@ -39,7 +39,7 @@ export default function QuizScreen() {
   const passed = total > 0 && score / total >= 0.6;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title: quiz.title }} />
       <ProfileHeader title={quiz.title} />
       <ScrollView contentContainerStyle={{ paddingBottom: theme.spacing[12] }}>

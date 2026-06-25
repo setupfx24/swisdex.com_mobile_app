@@ -52,7 +52,7 @@ export default function PortfolioExportScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title: 'Export' }} />
       <ProfileHeader title="Export trade history" />
       <View style={{ padding: theme.spacing[4], gap: theme.spacing[4] }}>

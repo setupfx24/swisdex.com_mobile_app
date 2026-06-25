@@ -4,13 +4,14 @@ import { router } from 'expo-router';
 import {
   User as UserIcon, LayoutGrid, Plus, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft,
   History, FileText, Download, CalendarClock, ShieldCheck,
-  Share2, Bell, Moon,
+  Share2, Bell, Languages, Moon,
   HelpCircle, MessageCircle, LogOut, ChevronRight, Calculator, Briefcase,
   PieChart, GraduationCap, Newspaper, Network, TrendingUp, Scale,
 } from 'lucide-react-native';
 import { Text, Divider, Pressable, GradientBackground } from '@/ui';
 import { useTheme } from '@/theme';
 import { useAuthStore } from '@/stores/authStore';
+import { useI18nStore } from '@/stores/i18nStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useThemeStore, type ThemeMode } from '@/stores/themeStore';
 
@@ -30,6 +31,7 @@ export default function MoreTab() {
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
   const unread = useNotificationsStore((s) => s.unread);
+  const lang = useI18nStore((s) => s.lang);
   const themeMode = useThemeStore((s) => s.mode);
   const setThemeMode = useThemeStore((s) => s.setMode);
 
@@ -87,6 +89,7 @@ export default function MoreTab() {
       title: 'Inbox & Settings',
       items: [
         { Icon: Bell, label: 'Inbox', hint: unread > 0 ? `${unread} unread` : undefined, onPress: () => router.push('/inbox') },
+        { Icon: Languages, label: 'Language', hint: lang.toUpperCase(), onPress: () => router.push('/settings/language') },
         { Icon: Moon, label: 'Theme', hint: THEME_LABEL[themeMode], onPress: () => { void setThemeMode(THEME_NEXT[themeMode]); } },
       ],
     },

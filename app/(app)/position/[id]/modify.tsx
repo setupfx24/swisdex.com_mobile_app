@@ -28,7 +28,7 @@ export default function ModifyPositionScreen() {
 
   if (!position) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
         <Stack.Screen options={{ title: 'Modify' }} />
         <ProfileHeader title="Modify position" />
         <View style={{ padding: theme.spacing[4] }}>
@@ -57,7 +57,7 @@ export default function ModifyPositionScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title: 'Modify' }} />
       <ProfileHeader title="Modify position" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

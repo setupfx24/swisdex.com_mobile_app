@@ -16,6 +16,7 @@ import { ApiError, ApiNetworkError, formatApiDetail } from '@/lib/api/errors';
 import { usePlatformStatusStore } from '@/stores/platformStatusStore';
 import type { PlatformStatus } from '@/types/auth';
 import { ProfileHeader } from '../profile';
+import { useKycApproved, KycNotice } from '@/features/wallet/KycGate';
 
 // Mirror the web trader's deposit flow (frontend/trader/src/app/wallet/page.tsx).
 // Two admin-gated rails: 'crypto' (NOWPayments hosted checkout) and 'manual'
@@ -57,6 +58,7 @@ interface ProofFile {
 
 export default function DepositScreen() {
   const theme = useTheme();
+  const kycApproved = useKycApproved();
   const status = usePlatformStatusStore((s) => s.status) as PlatformStatusWithMins | null;
   const user = useAuthStore((s) => s.user);
   const fullName =
@@ -332,6 +334,17 @@ export default function DepositScreen() {
       setSubmitting(false);
     }
   };
+
+  // Identity verification gate — no deposits until KYC is approved.
+  if (!kycApproved) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+        <Stack.Screen options={{ title: 'Deposit' }} />
+        <ProfileHeader title="Deposit" />
+        <KycNotice action="deposit" />
+      </SafeAreaView>
+    );
+  }
 
   // Deposits paused by the broker (allow_deposits === false).
   if (status && status.allow_deposits === false) {

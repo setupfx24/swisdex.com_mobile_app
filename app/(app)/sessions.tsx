@@ -57,7 +57,7 @@ export default function SessionsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
       <Stack.Screen options={{ title: 'Active sessions' }} />
       <ProfileHeader title="Active sessions" />
       <ScrollView
