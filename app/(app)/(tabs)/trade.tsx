@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView, TextInput } from 'react-native';
+import { View, ScrollView, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
@@ -21,8 +21,11 @@ import { PositionsPanel } from '@/features/trading/PositionsPanel';
 import { PanicCloseSheet } from '@/features/trading/PanicCloseSheet';
 import { TradingViewChart } from '@/charts/TradingViewChart';
 import { instrumentsApi } from '@/lib/api/instruments';
+import { accountsApi } from '@/lib/api/accounts';
 import { isCentAccount, fmtAccountMoney } from '@/lib/money';
 import type { OrderType } from '@/types/trading';
+
+const LEVERAGE_OPTIONS = [1, 25, 50, 100, 200, 300, 500, 1000, 2000];
 
 /** Vantage-style Trade terminal: account pill, symbol selector,
  *  signature dual buy/sell pill, volume stepper, info rows, big CTA. */
@@ -34,7 +37,13 @@ export default function TradeTab() {
   const updateTick = useMarketDataStore((s) => s.updateTick);
   const setInstruments = useMarketDataStore((s) => s.setInstruments);
   const active = useAccountsStore((s) => s.active);
+  const patchAccount = useAccountsStore((s) => s.patchAccount);
   const loadPositions = usePositionsStore((s) => s.load);
+
+  // Leverage picker (per-account; applies immediately via the leverage API).
+  const [leverageModalOpen, setLeverageModalOpen] = useState(false);
+  const [savingLev, setSavingLev] = useState<number | null>(null);
+  const [levError, setLevError] = useState<string | null>(null);
 
   const [lots, setLots] = useState('0.01');
   const [side, setSide] = useState<'buy' | 'sell' | null>(null);
@@ -175,6 +184,35 @@ export default function TradeTab() {
 
   const equity = active?.equity ?? 0;
   const leverage = active?.leverage ?? 100;
+
+  // Allowed leverage steps for this account, capped at the group's ceiling.
+  const levMax = Number(
+    active?.account_group?.effective_max_leverage
+    ?? active?.account_group?.max_leverage
+    ?? active?.account_group?.leverage_default
+    ?? leverage,
+  );
+  const leverageOptions = useMemo(() => {
+    const opts = LEVERAGE_OPTIONS.filter((l) => l <= levMax);
+    if (levMax > 0 && !opts.includes(levMax)) opts.push(levMax);
+    return Array.from(new Set(opts)).sort((a, b) => a - b);
+  }, [levMax]);
+
+  const applyLeverage = async (lev: number) => {
+    if (!active) return;
+    if (lev === active.leverage) { setLeverageModalOpen(false); return; }
+    setSavingLev(lev);
+    setLevError(null);
+    try {
+      await accountsApi.setLeverage(active.id, lev);
+      patchAccount(active.id, { leverage: lev });
+      setLeverageModalOpen(false);
+    } catch (e: unknown) {
+      setLevError(e instanceof Error ? e.message : 'Could not update leverage.');
+    } finally {
+      setSavingLev(null);
+    }
+  };
 
   const margin = useMemo(() => {
     const lotsNum = parseFloat(lots) || 0;
@@ -345,8 +383,8 @@ export default function TradeTab() {
             ask={tick?.ask}
             digits={digits}
             selected={selectedSide}
-            onSell={() => setSelectedSide('sell')}
-            onBuy={() => setSelectedSide('buy')}
+            onSell={() => { setSelectedSide('sell'); void submit('sell'); }}
+            onBuy={() => { setSelectedSide('buy'); void submit('buy'); }}
             disabled={side !== null || !tick}
           />
         ) : (
@@ -515,27 +553,23 @@ export default function TradeTab() {
             label="Margin Level After"
             value={marginLevelAfter > 0 ? `${marginLevelAfter.toFixed(2)}%` : '—'}
           />
-          <InfoRow theme={theme} label="Leverage" value={`1:${leverage}`} />
+          <InfoRow theme={theme} label="Leverage" value={`1:${leverage}`} onPress={active ? () => { setLevError(null); setLeverageModalOpen(true); } : undefined} />
         </View>
 
-        {/* Big CTA — only for market orders (pending has its own confirm) */}
+        {/* Market orders execute on tap of the Sell / Buy price pill above —
+            no separate confirm button. (Pending orders keep their own Place
+            button in the pending-price section.) */}
         {orderType === 'market' ? (
-          <Button
-            variant="buy"
-            color={selectedSide === 'sell' ? '#FF3B30' : '#34C759'}
-            size="xl"
-            onPress={() => submit(selectedSide)}
-            loading={side === selectedSide}
-            disabled={!tick || (side !== null && side !== selectedSide)}
-          >
-            {selectedSide === 'sell' ? 'Sell' : 'Buy'} {symbol}
-          </Button>
+          <Text variant="body" tone="tertiary" align="center">
+            Tap Sell or Buy above to place the trade instantly.
+          </Text>
         ) : null}
 
-        {/* Open positions for the active symbol + panic close */}
+        {/* Open + closed positions for ALL instruments on the active account
+            (not just the selected symbol) + panic close. */}
         <View style={{ paddingTop: theme.spacing[2] }}>
           <Divider />
-          <PositionsPanel symbolFilter={symbol} maxHeight={320} onOpenPanic={() => setPanicOpen(true)} />
+          <PositionsPanel maxHeight={320} onOpenPanic={() => setPanicOpen(true)} />
         </View>
       </ScrollView>
 
@@ -559,16 +593,68 @@ export default function TradeTab() {
           <Text variant="bodyMd" align="center">{toast}</Text>
         </View>
       ) : null}
+
+      {/* Leverage picker */}
+      <Modal visible={leverageModalOpen} transparent animationType="slide" onRequestClose={() => setLeverageModalOpen(false)}>
+        <Pressable onPress={() => setLeverageModalOpen(false)} style={{ flex: 1, backgroundColor: theme.colors.overlay, justifyContent: 'flex-end' }}>
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: theme.colors.bg.tertiary,
+              borderTopLeftRadius: theme.radius.xl, borderTopRightRadius: theme.radius.xl,
+              padding: theme.spacing[5], paddingBottom: theme.spacing[8],
+              borderWidth: 1, borderColor: theme.colors.border.primary, gap: theme.spacing[3],
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text variant="bodyLg" weight="bold">Account leverage</Text>
+              <Text variant="bodyMd" tone="tertiary">Max 1:{levMax}</Text>
+            </View>
+            <Text variant="body" tone="secondary">Applies to this account. Higher leverage = lower margin required, higher risk.</Text>
+            {levError ? <Text variant="body" tone="sell">{levError}</Text> : null}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing[2], marginTop: theme.spacing[1] }}>
+              {leverageOptions.map((l) => {
+                const sel = l === leverage;
+                const busy = savingLev === l;
+                return (
+                  <Pressable
+                    key={l}
+                    haptic="light"
+                    onPress={() => { void applyLeverage(l); }}
+                    disabled={savingLev != null}
+                    style={({ pressed }) => ({
+                      paddingVertical: theme.spacing[2], paddingHorizontal: theme.spacing[4],
+                      borderRadius: theme.radius.pill, borderWidth: 1.5,
+                      borderColor: sel ? theme.colors.buy : theme.colors.border.secondary,
+                      backgroundColor: sel ? theme.colors.buyBg : pressed ? theme.colors.bg.hover : theme.colors.bg.secondary,
+                      opacity: savingLev != null && !busy ? 0.5 : 1,
+                    })}
+                  >
+                    <Text variant="bodyMd" weight={sel ? 'bold' : 'medium'} style={sel ? { color: theme.colors.buy } : undefined}>
+                      {busy ? '…' : `1:${l}`}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
     </GradientBackground>
   );
 }
 
-function InfoRow({ theme, label, value }: { theme: ReturnType<typeof useTheme>; label: string; value: string }) {
-  return (
+function InfoRow({ theme, label, value, onPress }: { theme: ReturnType<typeof useTheme>; label: string; value: string; onPress?: () => void }) {
+  const body = (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <Text variant="bodyMd" tone="secondary">{label}</Text>
-      <Text variant="bodyMd" weight="medium">{value}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing[1] }}>
+        <Text variant="bodyMd" weight="medium">{value}</Text>
+        {onPress ? <ChevronDown size={15} color={theme.colors.buy} strokeWidth={2.2} /> : null}
+      </View>
     </View>
   );
+  if (!onPress) return body;
+  return <Pressable haptic="light" onPress={onPress}>{body}</Pressable>;
 }

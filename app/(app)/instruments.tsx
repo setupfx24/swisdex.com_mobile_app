@@ -11,7 +11,7 @@ import { loadCachedInstruments } from '@/lib/cache/instrumentsCache';
 import { ProfileHeader } from './profile';
 import type { InstrumentInfo } from '@/types/market';
 
-const SEGMENTS = ['all', 'forex', 'metals', 'crypto', 'indices', 'stocks', 'commodities'] as const;
+const SEGMENTS = ['all', 'forex', 'crypto', 'indices', 'stocks', 'commodities'] as const;
 type Segment = typeof SEGMENTS[number];
 
 export default function InstrumentsScreen() {

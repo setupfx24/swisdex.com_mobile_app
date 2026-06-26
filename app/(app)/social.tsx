@@ -67,7 +67,7 @@ export default function SocialScreen() {
   const [tab, setTab] = useState<TabId>('leaderboard');
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.bg.base }} edges={['top']}>
       <Stack.Screen options={{ title: 'MAMM' }} />
       <ProfileHeader title="MAMM Trading" />
 
